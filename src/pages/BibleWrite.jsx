@@ -47,23 +47,23 @@ export default function BibleWrite({ onFinish }) {
   }, []);
 
   // ⭐ [정밀 보고] 서버에 현재 위치(책 이름, 구절 번호)를 보고하는 함수
-  const reportProgressToServer = async (count, vIndex) => {
-    try {
-      // 전달받은 vIndex 혹은 현재 verseIndex를 기준으로 구절 정보를 가져옵니다.
-      const targetVerse = bibleData?.[vIndex !== undefined ? vIndex : verseIndex];
-      await fetch('/api/relay/update-verse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          count: count,
-          bookName: BIBLE_LIST[bookIndex].name,
-          verseNum: targetVerse?.v || 1
-        })
-      });
-    } catch (error) {
-      console.error("서버 보고 실패:", error);
-    }
-  };
+  const reportProgressToServer = async (count, vIdx) => {
+  try {
+    const targetVerse = bibleData?.[vIdx !== undefined ? vIdx : verseIndex];
+    await fetch('/api/relay/update-verse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        count: count,
+        bookName: BIBLE_LIST[bookIndex].name,
+        chapterNum: targetVerse?.c || 1, // ⭐ 장(Chapter) 번호 추가
+        verseNum: targetVerse?.v || 1
+      })
+    });
+  } catch (error) {
+    console.error("서버 보고 실패:", error);
+  }
+};
 
   // ⭐ [다음 구절] 이동 시 서버 보고 로직 포함
   const moveToNextVerse = useCallback(() => {

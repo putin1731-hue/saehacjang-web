@@ -31,6 +31,7 @@ let relayStatus = {
     verseCount: 0,
     // [신규] 현재 위치 추적용 (성도님이 필사 시 자동으로 업데이트됨)
     currentBookName: "창세기",
+    currentChapterNum: 1,  // ⭐ [추가]
     currentVerseNum: 1
 };
 
@@ -48,12 +49,12 @@ app.post('/api/login', (req, res) => {
 
 // [수정] 숫자(count)와 함께 책이름, 절번호를 수신하여 기록함
 app.post('/api/relay/update-verse', (req, res) => {
-    const { count, bookName, verseNum } = req.body; 
+    const { count, bookName, chapterNum, verseNum } = req.body; // ⭐ chapterNum 추가
     if (typeof count === 'number') {
         relayStatus.verseCount = count;
         if (bookName) relayStatus.currentBookName = bookName;
+        if (chapterNum) relayStatus.currentChapterNum = chapterNum; // ⭐ 추가
         if (verseNum) relayStatus.currentVerseNum = verseNum;
-        console.log(`✨ 필사 위치 갱신: ${relayStatus.currentBookName} ${relayStatus.currentVerseNum}절`);
         res.json({ success: true, count: relayStatus.verseCount });
     } else {
         res.status(400).json({ success: false });
