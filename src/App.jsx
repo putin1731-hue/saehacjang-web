@@ -12,9 +12,7 @@ import BibleWrite from "./pages/BibleWrite";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Pending from "./pages/Pending";
-
-// ⭐ 새로 추가된 관리자 대시보드
-import AdminDashboard from './pages/AdminDashboard'; 
+import AdminDashboard from "./pages/AdminDashboard";
 
 // 인증 및 세션 컨텍스트
 import { AuthProvider, useAuth } from "./context/AuthContext";
