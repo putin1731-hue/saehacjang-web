@@ -81,7 +81,7 @@ app.post('/api/nominate', (req, res) => {
 // 4. 성경 말씀 보급로 API (public/data/bible)
 app.get('/api/bible/:fileName', (req, res) => {
     const { fileName } = req.params;
-    const biblePath = path.resolve(__dirname, 'public', 'data', 'bible', fileName);
+    const biblePath = path.resolve(__dirname, 'data', 'bible', fileName);
     
     res.sendFile(biblePath, (err) => {
         if (err) {
