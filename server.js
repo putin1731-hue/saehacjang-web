@@ -14,7 +14,7 @@ app.use(cors());
 app.use(express.json());
 
 /* ─────────────────────────────────────────
-   [행정부 지시] 신도 명단 데이터 (기본 유지)
+   [행정부 지시] 신도 명단 데이터 (기존 유지)
 ───────────────────────────────────────── */
 const MEMBERS = [
     { id: 1, name: "이준혁", phone: "01012345678", role: "admin", activeTeams: 1 },
@@ -26,7 +26,7 @@ const MEMBERS = [
 ];
 
 /* ─────────────────────────────────────────
-   [지휘부 지시] 릴레이 상태 관리 엔진 (기본 유지)
+   [지휘부 지시] 릴레이 상태 관리 엔진 (기존 유지)
 ───────────────────────────────────────── */
 let relayStatus = {
     currentRunner: MEMBERS[0], 
@@ -38,10 +38,11 @@ let relayStatus = {
 };
 
 /* ─────────────────────────────────────────
-   [API 엔진] 기존 기능 유지 + 성경 보급로 추가
+   [1단계: API 엔진 정의] 
+   - 서버가 화면(HTML)보다 먼저 읽어야 하는 핵심 데이터 통로입니다.
 ───────────────────────────────────────── */
 
-// [기존] 상태 조회
+// 1. 상태 조회 API
 app.get('/api/relay/status', (req, res) => {
     const now = Date.now();
     const timeLeft = Math.max(0, relayStatus.deadline - now);
@@ -51,14 +52,14 @@ app.get('/api/relay/status', (req, res) => {
     });
 });
 
-// [기존] 로그인 인증
+// 2. 로그인 인증 API
 app.post('/api/login', (req, res) => {
     const { name, phone } = req.body;
     const user = MEMBERS.find(m => m.name === name && m.phone === phone);
     user ? res.json({ success: true, user }) : res.status(401).json({ success: false, message: "명단 확인 불가" });
 });
 
-// [기존] 지목하기 (행정 규칙 포함)
+// 3. 지목하기 API
 app.post('/api/nominate', (req, res) => {
     const { nextName, nextPhone } = req.body;
     const nextRunner = MEMBERS.find(m => m.name === nextName && m.phone === nextPhone);
@@ -77,10 +78,9 @@ app.post('/api/nominate', (req, res) => {
     res.json({ success: true, message: "바통 전달 완료" });
 });
 
-// ⭐ [신규 추가] 성경 말씀 보급로 (public/data/bible 파일 전송)
+// 4. 성경 말씀 보급로 API (public/data/bible)
 app.get('/api/bible/:fileName', (req, res) => {
     const { fileName } = req.params;
-    // public/data/bible 폴더 내의 파일을 안전하게 찾아갑니다.
     const biblePath = path.resolve(__dirname, 'public', 'data', 'bible', fileName);
     
     res.sendFile(biblePath, (err) => {
@@ -92,18 +92,21 @@ app.get('/api/bible/:fileName', (req, res) => {
 });
 
 /* ─────────────────────────────────────────
-   [배포 설정] 정적 파일 서비스
+   [2단계: 정적 파일 및 화면 연결] 
+   - API 주소가 아닌 모든 요청은 여기서 처리됩니다.
 ───────────────────────────────────────── */
+
+// 빌드된 리액트 파일(dist) 위치 확정
 const buildPath = path.resolve(__dirname, 'dist');
 app.use(express.static(buildPath));
 
-// 리액트 라우팅 대응
+// 그 외 모든 경로는 리액트의 메인 화면(index.html)으로 연결
 app.get('*', (req, res) => {
     res.sendFile(path.join(buildPath, 'index.html'));
 });
 
 /* ─────────────────────────────────────────
-   [Watcher] 타임아웃 감시 (1분마다)
+   [3단계: Watcher] 타임아웃 감시 (기존 유지)
 ───────────────────────────────────────── */
 cron.schedule('* * * * *', () => {
     if (Date.now() > relayStatus.deadline && !relayStatus.isConfirmed) {
