@@ -61,9 +61,15 @@ app.post('/api/login', (req, res) => {
 // ⭐ 3. [신규] 필사 구절 카운트 업데이트 API
 // 성도님이 '필사 완료' 버튼을 누를 때 호출되어 숫자를 올립니다.
 app.post('/api/relay/update-verse', (req, res) => {
-    relayStatus.verseCount += 1;
-    console.log(`✨ 필사 기록 갱신: 현재 총 ${relayStatus.verseCount}구절`);
-    res.json({ success: true, newCount: relayStatus.verseCount });
+    const { currentVerseIndex } = req.body; // 화면에서 "지금 몇 번째 절인가요?"를 보냅니다.
+    
+    if (typeof currentVerseIndex === 'number') {
+        relayStatus.verseCount = currentVerseIndex; // 서버 숫자를 즉시 갱신
+        console.log(`✨ 필사 진행 중! 현재: ${relayStatus.verseCount}구절 인정`);
+        res.json({ success: true, count: relayStatus.verseCount });
+    } else {
+        res.status(400).json({ success: false, message: "숫자 데이터가 필요합니다." });
+    }
 });
 
 // 4. 지목하기 API (기존 규칙 유지)
