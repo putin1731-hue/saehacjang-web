@@ -11,7 +11,7 @@ export default function Dashboard({ onNavigate }) {
   useEffect(() => {
     const fetchStatus = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/relay/status");
+        const response = await fetch('/api/relay/status');
         const data = await res.json();
         setRelayData(data);
       } catch (e) {
