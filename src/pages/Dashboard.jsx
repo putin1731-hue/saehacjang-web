@@ -9,12 +9,14 @@ export default function Dashboard({ onNavigate }) {
   useEffect(() => {
     const fetchStatus = async () => {
       try {
+        // [수정] 주소를 상대 경로로 변경하여 연결 안정성 확보
         const response = await fetch('/api/relay/status');
-        // [수정 1] res.json()이 아니라 response.json()입니다! (오타 수정)
+        if (!response.ok) throw new Error('네트워크 응답 에러');
+        
         const data = await response.json(); 
         setRelayData(data);
       } catch (e) {
-        console.error("지휘부 서버 연결 실패: 실시간 데이터를 가져올 수 없습니다.");
+        console.error("지휘부 서버 연결 실패:", e);
       } finally {
         setLoading(false);
       }
@@ -25,29 +27,24 @@ export default function Dashboard({ onNavigate }) {
     return () => clearInterval(interval);
   }, []);
 
-  // [수정 2] 데이터가 없거나 로딩 중일 때 계산 로직으로 넘어가지 않도록 방어막 설치
-  if (loading || !relayData) return (
-    <div className="min-h-screen bg-[#F9F7F2] flex items-center justify-center font-serif text-[#C5A059] animate-pulse">
-      성소의 최신 기록을 동기화 중입니다...
-    </div>
-  );
+  // [방어막] 데이터가 완전히 로드될 때까지 계산 로직 진입 차단
+  if (loading || !relayData) {
+    return (
+      <div className="min-h-screen bg-[#F9F7F2] flex items-center justify-center font-serif text-[#C5A059] animate-pulse">
+        성소의 기록을 불러오는 중입니다...
+      </div>
+    );
+  }
 
-  // [기술부: 정밀 시간 계산 로직]
-  const calculateTime = () => {
-    // 이제 relayData가 확실히 있을 때만 실행됩니다.
-    const diff = relayData.timeLeft || 0; 
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    return { hours, minutes };
-  };
-
-  const { hours, minutes } = calculateTime();
+  // [시간 계산] 안전하게 데이터가 있을 때만 실행
+  const diff = relayData.timeLeft || 0;
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
 
   return (
     <div className="min-h-screen bg-[#F9F7F2] py-12 px-6 font-sans">
       <div className="max-w-5xl mx-auto">
         
-        {/* 상단 헤더 섹션 */}
         <div className="mb-12 text-center">
           <h1 className="text-4xl font-black text-[#3a2e24] font-serif tracking-tighter">릴레이 사역 현황</h1>
           <p className="text-[#8b5e3c] mt-3 italic font-serif opacity-80">"한 사람의 진심이 온 공동체의 고백이 됩니다"</p>
@@ -55,7 +52,6 @@ export default function Dashboard({ onNavigate }) {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* 1. 실시간 주자 관제 카드 */}
           <div className="lg:col-span-2 bg-white rounded-[2.5rem] shadow-xl border border-[#E9DCC9] p-10 relative overflow-hidden">
             <div className="absolute top-8 right-8">
               <span className={`px-4 py-1.5 rounded-full text-[10px] font-bold tracking-widest uppercase border 
@@ -71,7 +67,7 @@ export default function Dashboard({ onNavigate }) {
               <div className="text-center md:text-left">
                 <p className="text-[#C5A059] text-[11px] font-black uppercase tracking-[0.2em] mb-2">Current Relay Runner</p>
                 <h2 className="text-4xl font-black text-[#3a2e24] font-serif tracking-tight">
-                  {relayData.currentRunner?.name} 성도님
+                  {relayData.currentRunner?.name || "주자 정보 없음"} 성도님
                 </h2>
                 <p className="text-[#8b5e3c] mt-2 font-medium opacity-70 italic">{relayData.currentRunner?.phone}</p>
               </div>
@@ -87,13 +83,12 @@ export default function Dashboard({ onNavigate }) {
               <div className="bg-[#F9F7F2]/50 p-6 rounded-3xl border border-[#E9DCC9]/30">
                 <p className="text-[10px] font-bold text-[#8b5e3c] uppercase mb-1">현재 절수(Verse)</p>
                 <p className="text-3xl font-serif text-[#3a2e24] font-bold">
-                  {relayData.verseCount} 구절 작성 중
+                  {relayData.verseCount || 0} 구절 작성 중
                 </p>
               </div>
             </div>
           </div>
 
-          {/* 2. 행정 규칙 공지 영역 */}
           <div className="bg-[#3a2e24] rounded-[2.5rem] shadow-2xl p-10 text-white flex flex-col justify-between relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-[#C5A059]/10 rounded-full -mr-16 -mt-16"></div>
             <div>
@@ -121,7 +116,6 @@ export default function Dashboard({ onNavigate }) {
           </div>
         </div>
 
-        {/* 3. 사역 히스토리 */}
         <div className="mt-10 bg-white rounded-[2.5rem] shadow-xl border border-[#E9DCC9] p-10">
           <div className="flex items-center justify-between mb-8">
             <h3 className="text-lg font-bold text-[#3a2e24] font-serif">🕊️ 사역 히스토리</h3>
