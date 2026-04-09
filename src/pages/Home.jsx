@@ -4,14 +4,13 @@ import { SLIDES } from "../components/slides/SlideScenes";
 
 export default function Home({ onNavigate }) {
   const [cur, setCur] = useState(0);
-  const [visible, setVisible] = useState([]);
   const timerRef = useRef(null);
-  const revealRef = useRef([]);
 
   const goSlide = useCallback((n) => {
     setCur(n);
   }, []);
 
+  // [수정] 슬라이드 자동 재생 (20초 간격)
   useEffect(() => {
     timerRef.current = setInterval(() => {
       setCur((c) => (c + 1) % SLIDES.length);
@@ -19,20 +18,7 @@ export default function Home({ onNavigate }) {
     return () => clearInterval(timerRef.current);
   }, []);
 
-  useEffect(() => {
-    const obs = new IntersectionObserver(
-      (entries) =>
-        entries.forEach((e) => {
-          if (e.isIntersecting)
-            setVisible((v) => [...v, e.target.dataset.id]);
-        }),
-      { threshold: 0.1 }
-    );
-
-    revealRef.current.forEach((el) => el && obs.observe(el));
-    return () => obs.disconnect();
-  }, []);
-
+  // 예배 안내 카드 컴포넌트
   const WorshipCard = ({ item }) => (
     <div className="rounded-[14px] p-[1.6rem_1.4rem] border border-[#e9dcc9] bg-white transition-all hover:-translate-y-1 hover:shadow-md group">
       <p className="text-sm text-gray-500">{item.label}</p>
@@ -63,7 +49,7 @@ export default function Home({ onNavigate }) {
           </div>
         ))}
 
-        {/* [디자인부] 왼쪽 날개: 브라우저 왼쪽 끝 밀착 (Fixed) */}
+        {/* 왼쪽 날개: 말씀 카드 */}
         <div className="fixed left-0 top-1/2 -translate-y-1/2 hidden lg:flex flex-col z-50">
           <div className="group bg-white/20 backdrop-blur-md border-r border-y border-white/40 p-4 rounded-r-3xl shadow-2xl w-14 hover:w-80 transition-all duration-700 ease-in-out overflow-hidden cursor-default">
             <div className="flex items-center gap-5 whitespace-nowrap">
@@ -79,7 +65,7 @@ export default function Home({ onNavigate }) {
           </div>
         </div>
 
-        {/* [디자인부] 오른쪽 날개: 브라우저 오른쪽 끝 밀착 (슬림 버전 w-40) */}
+        {/* 오른쪽 날개: 교회 소식 및 신청 */}
         <div className="fixed right-0 top-1/2 -translate-y-1/2 hidden xl:flex flex-col gap-4 z-50">
           <div className="bg-gradient-to-br from-white/95 to-[#fdf8f2]/95 backdrop-blur-sm p-4 rounded-l-[20px] shadow-xl border-l border-y border-white/60 w-40 transition-all hover:-translate-x-3 hover:shadow-2xl group">
             <span className="text-[8px] bg-[#c8923a] text-white px-2 py-0.5 rounded-full font-black tracking-tighter">ANNIVERSARY</span>
@@ -90,16 +76,17 @@ export default function Home({ onNavigate }) {
           <div className="bg-[#3a2e24] p-4 rounded-l-[20px] shadow-xl border-l border-y border-white/10 w-40 transition-all hover:-translate-x-4 hover:shadow-[0_15px_30px_rgba(0,0,0,0.3)]">
             <h3 className="font-bold text-white text-xs">성경 필사 릴레이</h3>
             <p className="text-[10px] text-white/60 mt-0.5">12팀 참여 중</p>
+            {/* [수정] apply 페이지가 없는 경우를 대비해 회원가입(signup)으로 연결 */}
             <button 
-              onClick={() => onNavigate('apply')} 
+              onClick={() => onNavigate('signup')} 
               className="mt-3 w-full py-2 bg-[#c8923a] text-white text-[10px] rounded-lg font-bold hover:bg-white hover:text-[#3a2e24] transition-all shadow-md active:scale-95"
             >
-              신청하기 ➔
+              참여하기 ➔
             </button>
           </div>
         </div>
 
-        {/* [디자인부] 중앙 텍스트: 상단 이동 + 밀착 정렬 + 고딕 브라운 컬러 */}
+        {/* 중앙 메인 텍스트 */}
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center pb-60 pointer-events-none">
           <h1 className="text-6xl font-black text-[#764d03] tracking-tighter font-sans drop-shadow-sm leading-none">
             새학장 교회
@@ -113,7 +100,7 @@ export default function Home({ onNavigate }) {
           </div>
         </div>
 
-        {/* 하단 dots */}
+        {/* 하단 점(Indicator) 네비게이션 */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-3 z-20">
           {SLIDES.map((_, i) => (
             <button
@@ -126,7 +113,7 @@ export default function Home({ onNavigate }) {
           ))}
         </div>
 
-        {/* 우측 슬라이드 바 */}
+        {/* 우측 수직 슬라이드 바 */}
         <div className="absolute top-1/2 right-8 -translate-y-1/2 hidden sm:flex flex-col gap-3 z-20">
           {SLIDES.map((_, i) => (
             <button
