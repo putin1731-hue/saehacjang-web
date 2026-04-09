@@ -83,6 +83,24 @@ export default function BibleWrite({ onFinish }) {
     }
   };
 
+  const handleSave = async () => {
+  // 1. 먼저 브라우저에 저장
+  localStorage.setItem('temp_bible', JSON.stringify(progress));
+
+  // 2. 서버에 "나 지금 몇 절까지 썼어!"라고 보고 (이게 핵심!)
+  try {
+    await fetch('https://saehacjang-web.onrender.com/api/relay/update-verse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ count: currentVerseIndex + 1 }) // 현재 쓰고 있는 위치 전송
+    });
+  } catch (error) {
+    console.error("서버 보고 실패:", error);
+  }
+
+  alert('저장되었습니다. 대시보드에도 반영되었습니다!');
+};
+
   // 3. 바통 터치 로직 (API 연동)
   const handleNominate = async () => {
     if (!nextName || !nextPhone) return alert("다음 주자의 성함과 연락처를 정확히 입력해 주세요.");
