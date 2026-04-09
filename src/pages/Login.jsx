@@ -2,21 +2,21 @@ import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 
 export default function Login({ onNavigate }) {
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState(""); // 휴대폰 번호 추가
-  const [authCode, setAuthCode] = useState(""); // 인증번호 추가
-  const [isSent, setIsSent] = useState(false); // 인증번호 전송 여부
+  const [name, setName] = useState(""); // 1. email 대신 name으로 변경
+  const [phone, setPhone] = useState("");
+  const [authCode, setAuthCode] = useState("");
+  const [isSent, setIsSent] = useState(false);
   const [error, setError] = useState("");
   const { login } = useAuth();
 
   // 1. 인증번호 전송 함수
   const sendAuthCode = () => {
-    if (!email.includes("@") || phone.length < 10) {
-      setError("이메일과 연락처를 정확히 입력해 주세요.");
+    // 성함과 연락처 유효성 검사 (이메일 체크 로직 제거)
+    if (name.length < 2 || phone.length < 10) {
+      setError("성함과 연락처를 정확히 입력해 주세요.");
       return;
     }
     setError("");
-    // 실제로는 여기서 Firebase의 전화번호 인증(Recaptcha 등) 로직이 돌아갑니다.
     alert(`${phone} 번호로 인증번호가 발송되었습니다. (테스트 번호: 1234)`);
     setIsSent(true);
   };
@@ -30,43 +30,44 @@ export default function Login({ onNavigate }) {
       return;
     }
 
-    // 인증번호 확인 (테스트용: 1234)
     if (authCode !== "1234") {
       setError("인증번호가 일치하지 않습니다.");
       return;
     }
 
-    // ── 성공 시 사용자 데이터 구성 ──
-    // 이메일과 전화번호를 결합하여 고유 사용자로 인식하게 합니다.
+    // ── [중요] 관리자 판별 로직 ──
+    // 이름이 '이준혁'이고 번호가 맞으면 'admin' 권한 부여
+    const isAdmin = name === "이준혁" && phone === "01012345678";
+
     const userData = {
-      email,
+      name,
       phone,
-      id: phone, // 전화번호를 고유 ID로 사용하면 중복 방지에 좋습니다.
-      role: email === "admin@test.com" ? "admin" : "member",
-      approved: true
+      id: phone,
+      role: isAdmin ? "admin" : "user", // 'admin' 권한 부여!
+      status: "ACTIVE" // 관리자는 즉시 활성화
     };
 
-    login(userData); // 이제 AuthContext에 이 정보가 담깁니다.
-    onNavigate("dashboard"); // 필사 대시보드로 이동
+    login(userData); 
+    onNavigate("dashboard"); 
   };
 
   return (
     <div className="min-h-screen bg-[#fdf8f2] flex items-center justify-center px-6">
       <div className="max-w-md w-full bg-white p-10 rounded-[2.5rem] shadow-xl border border-[#f5e6d3]">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-[#3a2e24] mb-2">성도 개별 로그인</h1>
+          <h1 className="text-3xl font-bold text-[#3a2e24] mb-2">성도 실명 로그인</h1>
           <p className="text-[#8b5e3c] text-sm">본인 인증 후 필사 여정을 이어가세요.</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
-          {/* 이메일 입력 */}
+          {/* 성함 입력 (이메일 대신) */}
           <input
-            type="email"
+            type="text"
             disabled={isSent}
             className="w-full p-4 rounded-2xl border-2 border-[#e9dcc9] focus:border-[#c8923a] outline-none transition-all"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="이메일 (example@test.com)"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="성함 (예: 이준혁)"
           />
 
           {/* 연락처 입력 */}
@@ -83,14 +84,14 @@ export default function Login({ onNavigate }) {
               <button 
                 type="button"
                 onClick={sendAuthCode}
-                className="px-4 bg-[#8b5e3c] text-white rounded-2xl text-xs font-bold"
+                className="px-4 bg-[#8b5e3c] text-white rounded-2xl text-xs font-bold whitespace-nowrap"
               >
                 번호인증
               </button>
             )}
           </div>
 
-          {/* 인증번호 입력 (전송 후에만 표시) */}
+          {/* 인증번호 입력 */}
           {isSent && (
             <input
               type="text"
@@ -109,7 +110,7 @@ export default function Login({ onNavigate }) {
               isSent ? "bg-[#c8923a] text-white" : "bg-gray-200 text-gray-400 cursor-not-allowed"
             }`}
           >
-            로그인하여 필사 이어하기
+            로그인
           </button>
         </form>
       </div>
