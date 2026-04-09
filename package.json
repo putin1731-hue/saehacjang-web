@@ -33,7 +33,7 @@
     "nodemon": "^3.1.4",
     "postcss": "^8.4.41",
     "tailwindcss": "^3.4.10",
-    "vite": "^5.4.1"
+    "vite": "^8.0.8"
   },
   "description": "새학장교회 24시간 무중단 운영 서버 설정",
   "main": "server.js",
