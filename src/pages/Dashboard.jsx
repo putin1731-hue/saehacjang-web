@@ -9,7 +9,6 @@ export default function Dashboard({ onNavigate }) {
   useEffect(() => {
     const fetchStatus = async () => {
       try {
-        // [수정] 주소를 상대 경로로 변경하여 연결 안정성 확보
         const response = await fetch('/api/relay/status');
         if (!response.ok) throw new Error('네트워크 응답 에러');
         
@@ -27,7 +26,6 @@ export default function Dashboard({ onNavigate }) {
     return () => clearInterval(interval);
   }, []);
 
-  // [방어막] 데이터가 완전히 로드될 때까지 계산 로직 진입 차단
   if (loading || !relayData) {
     return (
       <div className="min-h-screen bg-[#F9F7F2] flex items-center justify-center font-serif text-[#C5A059] animate-pulse">
@@ -36,7 +34,6 @@ export default function Dashboard({ onNavigate }) {
     );
   }
 
-  // [시간 계산] 안전하게 데이터가 있을 때만 실행
   const diff = relayData.timeLeft || 0;
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
@@ -80,10 +77,15 @@ export default function Dashboard({ onNavigate }) {
                   {hours}시간 {minutes}분
                 </p>
               </div>
+              
+              {/* ⭐ [수정 영역] '절수' 대신 '진행 상황' 이정표로 변경 */}
               <div className="bg-[#F9F7F2]/50 p-6 rounded-3xl border border-[#E9DCC9]/30">
-                <p className="text-[10px] font-bold text-[#8b5e3c] uppercase mb-1">현재 절수(Verse)</p>
-                <p className="text-3xl font-serif text-[#3a2e24] font-bold">
-                  {relayData.verseCount || 0} 구절 작성 중
+                <p className="text-[10px] font-bold text-[#8b5e3c] uppercase mb-1">현재 필사 진행 상황</p>
+                <p className="text-2xl md:text-3xl font-serif text-[#3a2e24] font-bold leading-tight">
+                  {relayData.currentBookName} {relayData.currentVerseNum}절 진행 중
+                </p>
+                <p className="text-[11px] text-[#C5A059] mt-2 font-medium italic">
+                  * 공동체가 함께 {relayData.verseCount || 0}구절을 이어왔습니다.
                 </p>
               </div>
             </div>

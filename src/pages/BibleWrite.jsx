@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { BIBLE_LIST } from "../data/bibleMeta"; 
+import { BIBLE_LIST } from "../data/bibleMeta";
 
 export default function BibleWrite({ onFinish }) {
   const [bookIndex, setBookIndex] = useState(() => Number(localStorage.getItem("lastBookIndex")) || 0);
@@ -46,19 +46,26 @@ export default function BibleWrite({ onFinish }) {
     setShowChapterComplete(false);
   }, []);
 
-  // ⭐ [기술부 핵심 수리] 서버에 현재 구절 수를 보고하는 함수
-  const reportProgressToServer = async (count) => {
+  // ⭐ [정밀 보고] 서버에 현재 위치(책 이름, 구절 번호)를 보고하는 함수
+  const reportProgressToServer = async (count, vIndex) => {
     try {
+      // 전달받은 vIndex 혹은 현재 verseIndex를 기준으로 구절 정보를 가져옵니다.
+      const targetVerse = bibleData?.[vIndex !== undefined ? vIndex : verseIndex];
       await fetch('/api/relay/update-verse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ count: count })
+        body: JSON.stringify({ 
+          count: count,
+          bookName: BIBLE_LIST[bookIndex].name,
+          verseNum: targetVerse?.v || 1
+        })
       });
     } catch (error) {
       console.error("서버 보고 실패:", error);
     }
   };
 
+  // ⭐ [다음 구절] 이동 시 서버 보고 로직 포함
   const moveToNextVerse = useCallback(() => {
     if (!bibleData || !isVerseComplete) return;
 
@@ -69,8 +76,8 @@ export default function BibleWrite({ onFinish }) {
       return;
     }
 
-    // 다음 구절로 넘어갈 때도 실시간으로 서버에 보고합니다.
-    reportProgressToServer(nextVerse);
+    // 다음 구절로 넘어갈 때 정보를 서버에 보고
+    reportProgressToServer(nextVerse, nextVerse);
     updateState(bookIndex, nextVerse);
   }, [bibleData, verseIndex, bookIndex, isVerseComplete, updateState]);
 
@@ -92,21 +99,16 @@ export default function BibleWrite({ onFinish }) {
     }
   };
 
-  // ⭐ [잠시 멈추기] 버튼 클릭 시 실행될 로직
+  // ⭐ [잠시 멈추기] 현재 위치 정밀 보고 후 종료
   const handleStopAndSave = async () => {
-    // 1. 서버에 현재까지 쓴 구절 수 보고 (현재 인덱스만큼 인정)
-    await reportProgressToServer(verseIndex);
-    
-    alert(`현재까지의 여정(${verseIndex}구절)이 대시보드에 기록되었습니다.`);
-    
-    // 2. 메인 화면으로 이동
+    await reportProgressToServer(verseIndex, verseIndex);
+    alert(`현재까지의 여정(${BIBLE_LIST[bookIndex].name} ${currentBible.v}절)이 기록되었습니다.`);
     onFinish();
   };
 
   const handleNominate = async () => {
     if (!nextName || !nextPhone) return alert("다음 주자의 성함과 연락처를 정확히 입력해 주세요.");
     try {
-      // 주소는 상대경로로 수정하여 배포 환경에 맞춥니다.
       const res = await fetch('/api/nominate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -214,8 +216,9 @@ export default function BibleWrite({ onFinish }) {
             </div>
 
             <div className="mt-8 flex items-center justify-center gap-6 border-b border-[#E9DCC9] pb-10">
-              {/* ⭐ [수정] 잠시 멈추기 버튼에 handleStopAndSave 함수 연결 */}
-              <button onClick={handleStopAndSave} className="px-10 py-3.5 text-[#8b5e3c] font-bold hover:underline underline-offset-8 transition-all text-sm">잠시 멈추기</button>
+              <button onClick={handleStopAndSave} className="px-10 py-3.5 text-[#8b5e3c] font-bold hover:underline underline-offset-8 transition-all text-sm">
+                잠시 멈추기
+              </button>
               <button 
                 disabled={!isVerseComplete} 
                 onClick={moveToNextVerse} 
