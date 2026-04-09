@@ -1,6 +1,6 @@
 import React, { useState, useEffect, Suspense } from "react";
 
-// 기존 임포트
+// 페이지 컴포넌트 임포트
 import Navbar from "./components/Navbar";
 import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
@@ -20,53 +20,59 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 function AppInner() {
   const { user, logout, loading: authLoading } = useAuth();
   
-  const [currentPage, setCurrentPage] = useState(() => {
-    return localStorage.getItem("current_page") || "home";
-  });
+  // [개정] 사용자가 처음 들어올 때는 무조건 'home' 화면이 나오도록 초기값 고정
+  const [currentPage, setCurrentPage] = useState("home");
 
   const isLoggedIn = !!user;
+  // user 객체의 role이 admin인지 확인하여 마스터키 권한 부여
   const isAdmin = user?.role === "admin";
 
   const navigate = (page) => {
     console.log(`🚀 [시스템 이동] ${currentPage} -> ${page}`);
+    // 나중에 다시 들어올 때를 위해 페이지를 기억하고 싶다면 저장, 
+    // 하지만 첫 접속은 항상 home이어야 하므로 useState 초기값은 "home" 유지
     localStorage.setItem("current_page", page);
     setCurrentPage(page);
     window.scrollTo(0, 0);
   };
 
-  // [보안 로직 업데이트] 
+  /* ─────────────────────────────────────────────────────────────
+     [보안 관제 엔진] 특정 페이지 접근 권한 실시간 체크
+  ───────────────────────────────────────────────────────────── */
   useEffect(() => {
     const protectedPages = ["bible", "dashboard", "prayer"];
-    const adminOnlyPages = ["pastor-office"]; // 관리자 전용 페이지 목록
+    const adminOnlyPages = ["pastor-office"]; // 목사님 전용 관제 센터
 
-    // 1. 비로그인 사용자 차단
+    // 1. 비로그인 사용자 차단 (필사, 대시보드, 기도 게시판)
     if (protectedPages.includes(currentPage) && !authLoading && !isLoggedIn) {
-      console.warn("⚠️ [보안 알림] 접근 권한이 없습니다. 로그인 페이지로 이동합니다.");
+      console.warn("⚠️ [보안 알림] 성도 인증이 필요한 메뉴입니다. 로그인으로 이동합니다.");
       navigate("login");
     }
 
-    // 2. ⭐ 관리자 전용 페이지 보안 체크 (일반 유저가 접근 시 대시보드로 쫓아냄)
+    // 2. 관리자 전용 구역 보안 체크 (일반 성도가 접근 시 대시보드로 회송)
     if (adminOnlyPages.includes(currentPage) && !authLoading) {
-        if (!isAdmin) {
-            console.error("⛔ [접근 거부] 관리자 전용 구역입니다.");
-            navigate("dashboard");
-        }
+      if (!isAdmin) {
+        console.error("⛔ [접근 거부] 관리자 전용 구역입니다. 접근이 차단되었습니다.");
+        navigate("dashboard");
+      }
     }
   }, [currentPage, isLoggedIn, isAdmin, authLoading]);
 
-  // 로딩 화면
+  // 시스템 로딩 화면 (Sanctuary Syncing...)
   if (authLoading) {
     return (
       <div className="min-h-screen bg-[#F9F7F2] flex items-center justify-center font-serif text-[#C5A059]">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-[#C5A059] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="animate-pulse tracking-widest uppercase text-xs font-bold">Sanctuary Syncing...</p>
+          <p className="animate-pulse tracking-widest uppercase text-xs font-bold">새학장 서버 연결 중...</p>
         </div>
       </div>
     );
   }
 
-  // [라우팅 엔진] 이식된 부분 포함
+  /* ─────────────────────────────────────────────────────────────
+     [라우팅 엔진] 현재 페이지 상태에 따라 컴포넌트 렌더링
+  ───────────────────────────────────────────────────────────── */
   const renderPage = () => {
     switch (currentPage) {
       case "pastor": return <PastorGreeting onNavigate={navigate} />;
@@ -79,7 +85,7 @@ function AppInner() {
       case "signup": return <Signup onNavigate={navigate} />;
       case "pending": return <Pending />;
       
-      // ⭐ 관리자 전용 비밀 통로 (AdminDashboard) 이식
+      // 관리자 전용 비밀 통로 (AdminDashboard)
       case "pastor-office": 
         return isAdmin ? <AdminDashboard onNavigate={navigate} /> : <Dashboard onNavigate={navigate} />;
 
@@ -90,6 +96,7 @@ function AppInner() {
 
   return (
     <div className="min-h-screen bg-[#F9F7F2] font-sans selection:bg-[#C5A059] selection:text-white">
+      {/* 상단 네비게이션 바 */}
       <Navbar
         onNavigate={navigate}
         isLoggedIn={isLoggedIn}
@@ -103,21 +110,24 @@ function AppInner() {
         }}
       />
 
+      {/* 메인 콘텐츠 영역 */}
       <main className="pt-[75px] animate-in fade-in duration-700">
         <Suspense fallback={<div className="bg-[#F9F7F2] h-screen" />}>
           {renderPage()}
         </Suspense>
       </main>
 
+      {/* 하단 푸터 */}
       <footer className="py-12 bg-white border-t border-[#E9DCC9] mt-20 text-center">
         <p className="text-[11px] text-[#8b5e3c] font-serif tracking-widest opacity-60 uppercase">
-          Digital Sanctuary &copy; 2026. All Rights Reserved.
+          Saehacjang Digital Sanctuary &copy; 2026. All Rights Reserved.
         </p>
       </footer>
     </div>
   );
 }
 
+// 최상위 App 컴포넌트: 전역 인증 상태(AuthProvider) 주입
 export default function App() {
   return (
     <AuthProvider>
