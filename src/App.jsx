@@ -1,6 +1,6 @@
 import React, { useState, useEffect, Suspense } from "react";
 
-// 페이지 컴포넌트 임포트
+// 페이지 컴포넌트 임포트 (기존과 동일)
 import Navbar from "./components/Navbar";
 import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
@@ -20,59 +20,63 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 function AppInner() {
   const { user, logout, loading: authLoading } = useAuth();
   
-  // [개정] 사용자가 처음 들어올 때는 무조건 'home' 화면이 나오도록 초기값 고정
+  // [개정] 첫 접속 시 무조건 home으로 고정
   const [currentPage, setCurrentPage] = useState("home");
 
+  // [수정] 오직 'pastor-office' 페이지에 있을 때만 Navbar에 관리자 메뉴(빨간 버튼)가 보이게 설정
   const isLoggedIn = !!user;
-  // user 객체의 role이 admin인지 확인하여 마스터키 권한 부여
-  const isAdmin = user?.role === "admin";
+  const isPastorOffice = currentPage === "pastor-office";
+  const showAdminMenu = user?.role === "admin" && isPastorOffice;
 
   const navigate = (page) => {
-    console.log(`🚀 [시스템 이동] ${currentPage} -> ${page}`);
-    // 나중에 다시 들어올 때를 위해 페이지를 기억하고 싶다면 저장, 
-    // 하지만 첫 접속은 항상 home이어야 하므로 useState 초기값은 "home" 유지
-    localStorage.setItem("current_page", page);
+    console.log(`🚀 [시스템 이동] ${page}`);
     setCurrentPage(page);
     window.scrollTo(0, 0);
   };
 
   /* ─────────────────────────────────────────────────────────────
-     [보안 관제 엔진] 특정 페이지 접근 권한 실시간 체크
+     [보안 관제 엔진] 기획관님 지침 반영
   ───────────────────────────────────────────────────────────── */
   useEffect(() => {
-    const protectedPages = ["bible", "dashboard", "prayer"];
-    const adminOnlyPages = ["pastor-office"]; // 목사님 전용 관제 센터
+    // 1. 첫 접속 시 자동 로그아웃 (사람들이 처음 들어왔을 때 로그아웃 상태를 보장)
+    // 이 로직은 배포 초기 테스트 시 사용자들이 깨끗한 상태로 시작하게 돕습니다.
+    // 만약 계속 자동 로그아웃되는 게 불편하시면 이 useEffect를 주석 처리하세요.
+    const isFirstVisit = !sessionStorage.getItem("visited");
+    if (isFirstVisit) {
+      logout();
+      sessionStorage.setItem("visited", "true");
+    }
+  }, [logout]);
 
-    // 1. 비로그인 사용자 차단 (필사, 대시보드, 기도 게시판)
+  useEffect(() => {
+    const protectedPages = ["bible", "dashboard", "prayer"];
+    const adminOnlyPages = ["pastor-office"];
+
+    // 2. 비로그인 사용자 차단
     if (protectedPages.includes(currentPage) && !authLoading && !isLoggedIn) {
-      console.warn("⚠️ [보안 알림] 성도 인증이 필요한 메뉴입니다. 로그인으로 이동합니다.");
       navigate("login");
     }
 
-    // 2. 관리자 전용 구역 보안 체크 (일반 성도가 접근 시 대시보드로 회송)
+    // 3. 관리자 전용 구역 보안 체크
     if (adminOnlyPages.includes(currentPage) && !authLoading) {
-      if (!isAdmin) {
-        console.error("⛔ [접근 거부] 관리자 전용 구역입니다. 접근이 차단되었습니다.");
-        navigate("dashboard");
+      if (user?.role !== "admin") {
+        console.error("⛔ [접근 거부] 일반 성도는 진입할 수 없습니다.");
+        navigate("home"); // 관리자 아니면 홈으로 쫓아냄
       }
     }
-  }, [currentPage, isLoggedIn, isAdmin, authLoading]);
+  }, [currentPage, isLoggedIn, user, authLoading]);
 
-  // 시스템 로딩 화면 (Sanctuary Syncing...)
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-[#F9F7F2] flex items-center justify-center font-serif text-[#C5A059]">
+      <div className="min-h-screen bg-[#F9F7F2] flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-[#C5A059] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="animate-pulse tracking-widest uppercase text-xs font-bold">새학장 서버 연결 중...</p>
+          <p className="animate-pulse tracking-widest text-xs font-bold text-[#C5A059]">서버 연결 중...</p>
         </div>
       </div>
     );
   }
 
-  /* ─────────────────────────────────────────────────────────────
-     [라우팅 엔진] 현재 페이지 상태에 따라 컴포넌트 렌더링
-  ───────────────────────────────────────────────────────────── */
   const renderPage = () => {
     switch (currentPage) {
       case "pastor": return <PastorGreeting onNavigate={navigate} />;
@@ -84,23 +88,19 @@ function AppInner() {
       case "login": return <Login onNavigate={navigate} />;
       case "signup": return <Signup onNavigate={navigate} />;
       case "pending": return <Pending />;
-      
-      // 관리자 전용 비밀 통로 (AdminDashboard)
       case "pastor-office": 
-        return isAdmin ? <AdminDashboard onNavigate={navigate} /> : <Dashboard onNavigate={navigate} />;
-
+        return user?.role === "admin" ? <AdminDashboard onNavigate={navigate} /> : <Home onNavigate={navigate} />;
       case "home":
       default: return <Home onNavigate={navigate} />;
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#F9F7F2] font-sans selection:bg-[#C5A059] selection:text-white">
-      {/* 상단 네비게이션 바 */}
+    <div className="min-h-screen bg-[#F9F7F2] font-sans">
       <Navbar
         onNavigate={navigate}
         isLoggedIn={isLoggedIn}
-        isAdmin={isAdmin}
+        isAdmin={showAdminMenu} // [핵심] pastor-office 주소일 때만 true가 넘어감
         currentPage={currentPage}
         onLogout={() => {
           if (window.confirm("로그아웃하시겠습니까?")) {
@@ -110,24 +110,21 @@ function AppInner() {
         }}
       />
 
-      {/* 메인 콘텐츠 영역 */}
       <main className="pt-[75px] animate-in fade-in duration-700">
         <Suspense fallback={<div className="bg-[#F9F7F2] h-screen" />}>
           {renderPage()}
         </Suspense>
       </main>
 
-      {/* 하단 푸터 */}
       <footer className="py-12 bg-white border-t border-[#E9DCC9] mt-20 text-center">
         <p className="text-[11px] text-[#8b5e3c] font-serif tracking-widest opacity-60 uppercase">
-          Saehacjang Digital Sanctuary &copy; 2026. All Rights Reserved.
+          Digital Sanctuary &copy; 2026. All Rights Reserved.
         </p>
       </footer>
     </div>
   );
 }
 
-// 최상위 App 컴포넌트: 전역 인증 상태(AuthProvider) 주입
 export default function App() {
   return (
     <AuthProvider>

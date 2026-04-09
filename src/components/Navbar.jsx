@@ -1,7 +1,5 @@
 import { useState, useEffect } from "react";
 
-// 초기 메뉴 구성 데이터 (성경 필사 및 사역 대시보드 추가)
-// Navbar.jsx 상단 NAV_CONFIG 내부
 const NAV_CONFIG = {
   about: {
     label: "교회소개",
@@ -20,7 +18,6 @@ const NAV_CONFIG = {
       { label: "주일학교", key: "school" },
     ],
   },
-  // '성경공부'를 큰 버튼(상위 메뉴)으로 하고 하위 항목 구성
   bible_study: {
     label: "성경공부",
     subItems: [
@@ -31,6 +28,7 @@ const NAV_CONFIG = {
   prayer: { label: "고민 남기기", key: "prayer" },
   location: { label: "찾아오시는길", key: "location" },
 };
+
 export default function Navbar({ isLoggedIn, isAdmin, currentPage, onNavigate, onLogout }) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -81,7 +79,6 @@ export default function Navbar({ isLoggedIn, isAdmin, currentPage, onNavigate, o
                     {item.label}
                   </button>
 
-                  {/* 드롭다운 메뉴 (교회소개, 교회활동 처럼 subItems가 있는 경우) */}
                   {item.subItems && (
                     <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 pointer-events-none group-hover:pointer-events-auto transition-all duration-200">
                       <div className="flex items-center bg-white shadow-xl rounded-full border border-[#f5e6d3] overflow-hidden px-2">
@@ -124,14 +121,15 @@ export default function Navbar({ isLoggedIn, isAdmin, currentPage, onNavigate, o
               )}
             </li>
 
-            {/* 관리자 버튼 */}
+            {/* ⭐ 관리자 버튼 보안 수정: App에서 넘겨받은 isAdmin이 true일 때만 노출 
+                (App에서 이미 '관리자 주소'일 때만 true를 보내주도록 고쳤습니다) */}
             {isLoggedIn && isAdmin && (
               <li className="ml-1">
                 <button
-                  onClick={() => onNavigate("admin")}
-                  className="px-3 py-1.5 text-xs font-bold text-red-600 border border-red-200 rounded-full hover:bg-red-50"
+                  onClick={() => onNavigate("pastor-office")}
+                  className="px-3 py-1.5 text-xs font-bold text-red-600 border border-red-200 rounded-full bg-red-50 hover:bg-red-100 animate-pulse shadow-sm"
                 >
-                  Admin
+                  관제모드 ON
                 </button>
               </li>
             )}
@@ -144,17 +142,15 @@ export default function Navbar({ isLoggedIn, isAdmin, currentPage, onNavigate, o
         </button>
       </div>
 
-      {/* 모바일 메뉴 레이어 */}
+      {/* 모바일 메뉴 레이어 (관리자 버튼 포함) */}
       {menuOpen && (
         <div className="sm:hidden bg-[#fdf8f2] border-t border-[#f5e6d3] py-4 shadow-inner">
           {activeNavKeys.map((key) => {
             const item = NAV_CONFIG[key];
             return (
               <div key={key}>
-                {/* 메인 메뉴 버튼 */}
                 <button
                   onClick={() => {
-                    // 서브 메뉴가 없는 경우만 바로 이동
                     if (!item.subItems) {
                       onNavigate(key);
                       setMenuOpen(false);
@@ -166,8 +162,6 @@ export default function Navbar({ isLoggedIn, isAdmin, currentPage, onNavigate, o
                 >
                   {item.label}
                 </button>
-                
-                {/* 모바일용 서브 메뉴 표시 (있을 경우) */}
                 {item.subItems && (
                   <div className="bg-[#fcfaf7] pb-2">
                     {item.subItems.map((sub) => (
@@ -187,6 +181,18 @@ export default function Navbar({ isLoggedIn, isAdmin, currentPage, onNavigate, o
               </div>
             );
           })}
+          {/* 모바일 관리자 버튼 */}
+          {isLoggedIn && isAdmin && (
+            <button
+              onClick={() => {
+                onNavigate("pastor-office");
+                setMenuOpen(false);
+              }}
+              className="w-full text-center py-4 text-red-600 font-bold bg-red-50 border-t border-red-100"
+            >
+              🏛️ 관리자 관제 센터 입장
+            </button>
+          )}
         </div>
       )}
     </nav>
