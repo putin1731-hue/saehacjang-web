@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { worshipSchedule } from "../data/mockData";
-import { SLIDES } from "../components/slides/SlideScenes";
+import { SLIDES } from "../components/slides/SlideScenes.jsx";
 
 export default function Home({ onNavigate }) {
   const [cur, setCur] = useState(0);
