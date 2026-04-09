@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from "react";
 import { BIBLE_LIST } from "../data/bibleMeta"; 
 
 export default function BibleWrite({ onFinish }) {
-  // [강철 세션 유지] 새로고침해도 튕기지 않는 초기값 설정
   const [bookIndex, setBookIndex] = useState(() => Number(localStorage.getItem("lastBookIndex")) || 0);
   const [verseIndex, setVerseIndex] = useState(() => Number(localStorage.getItem("lastVerseIndex")) || 0);
   const [bibleData, setBibleData] = useState(null);
@@ -12,12 +11,10 @@ export default function BibleWrite({ onFinish }) {
   const [loading, setLoading] = useState(true);
   const [isFocused, setIsFocused] = useState(false);
 
-  // [디자인부 최신 기능] 지목 및 모달 상태
   const [nextName, setNextName] = useState("");
   const [nextPhone, setNextPhone] = useState("");
   const [showChapterComplete, setShowChapterComplete] = useState(false);
 
-  // 1. 말씀 데이터 로드 로직
   useEffect(() => {
     const loadBible = async () => {
       try {
@@ -38,7 +35,6 @@ export default function BibleWrite({ onFinish }) {
 
   const currentBible = bibleData?.[verseIndex];
 
-  // 2. [기술부 수리] 이동 로직 (디자인부 모달 연동)
   const updateState = useCallback((nextBook, nextVerse) => {
     setBookIndex(nextBook);
     setVerseIndex(nextVerse);
@@ -50,23 +46,37 @@ export default function BibleWrite({ onFinish }) {
     setShowChapterComplete(false);
   }, []);
 
+  // ⭐ [기술부 핵심 수리] 서버에 현재 구절 수를 보고하는 함수
+  const reportProgressToServer = async (count) => {
+    try {
+      await fetch('/api/relay/update-verse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ count: count })
+      });
+    } catch (error) {
+      console.error("서버 보고 실패:", error);
+    }
+  };
+
   const moveToNextVerse = useCallback(() => {
     if (!bibleData || !isVerseComplete) return;
 
     let nextVerse = verseIndex + 1;
     
-    // 장 완료 시 디자인부 '은혜로운 모달' 활성화
     if (nextVerse >= bibleData.length) {
       setShowChapterComplete(true);
       return;
     }
 
+    // 다음 구절로 넘어갈 때도 실시간으로 서버에 보고합니다.
+    reportProgressToServer(nextVerse);
     updateState(bookIndex, nextVerse);
   }, [bibleData, verseIndex, bookIndex, isVerseComplete, updateState]);
 
   const handleInputChange = (e) => {
     const val = e.target.value;
-    if (val.length > userInput.length + 2) return; // 복사 방지 유지
+    if (val.length > userInput.length + 2) return;
     setUserInput(val);
 
     if (currentBible) {
@@ -76,36 +86,28 @@ export default function BibleWrite({ onFinish }) {
   };
 
   const handleKeyDown = (e) => {
-    // 엔터키 입력 시 즉시 이동 (기술부 수리 완료)
     if (e.key === "Enter" && isVerseComplete) {
       e.preventDefault();
       moveToNextVerse();
     }
   };
 
-  const handleSave = async () => {
-  // 1. 먼저 브라우저에 저장
-  localStorage.setItem('temp_bible', JSON.stringify(progress));
+  // ⭐ [잠시 멈추기] 버튼 클릭 시 실행될 로직
+  const handleStopAndSave = async () => {
+    // 1. 서버에 현재까지 쓴 구절 수 보고 (현재 인덱스만큼 인정)
+    await reportProgressToServer(verseIndex);
+    
+    alert(`현재까지의 여정(${verseIndex}구절)이 대시보드에 기록되었습니다.`);
+    
+    // 2. 메인 화면으로 이동
+    onFinish();
+  };
 
-  // 2. 서버에 "나 지금 몇 절까지 썼어!"라고 보고 (이게 핵심!)
-  try {
-    await fetch('https://saehacjang-web.onrender.com/api/relay/update-verse', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ count: currentVerseIndex + 1 }) // 현재 쓰고 있는 위치 전송
-    });
-  } catch (error) {
-    console.error("서버 보고 실패:", error);
-  }
-
-  alert('저장되었습니다. 대시보드에도 반영되었습니다!');
-};
-
-  // 3. 바통 터치 로직 (API 연동)
   const handleNominate = async () => {
     if (!nextName || !nextPhone) return alert("다음 주자의 성함과 연락처를 정확히 입력해 주세요.");
     try {
-      const res = await fetch('http://localhost:5000/api/nominate', {
+      // 주소는 상대경로로 수정하여 배포 환경에 맞춥니다.
+      const res = await fetch('/api/nominate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nextName, nextPhone })
@@ -127,7 +129,6 @@ export default function BibleWrite({ onFinish }) {
   return (
     <div className="min-h-screen bg-[#F9F7F2] py-8 px-6 font-sans select-none relative" onContextMenu={e => e.preventDefault()}>
       
-      {/* [디자인부] 완료 축하 모달 - UI 가이드 준수 */}
       {showChapterComplete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#3a2e24]/40 backdrop-blur-sm">
           <div className="bg-[#F9F7F2] p-12 rounded-[2.5rem] border-2 border-[#C5A059] text-center shadow-2xl max-w-md mx-4 animate-in zoom-in duration-300">
@@ -145,8 +146,6 @@ export default function BibleWrite({ onFinish }) {
       )}
 
       <div className="max-w-4xl mx-auto">
-        
-        {/* [디자인부] 상단 헤더 UI 유지 */}
         <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between border-b-2 border-[#E9DCC9] pb-4 gap-4">
           <div className="flex-1">
             <div className="flex items-center gap-4">
@@ -160,7 +159,6 @@ export default function BibleWrite({ onFinish }) {
             </p>
           </div>
 
-          {/* 진도율 바: 디자인부 신약 포인트 정밀 정렬 */}
           <div className="w-full md:w-64 flex flex-col gap-2 relative">
             <div className="flex justify-between text-[11px] font-extrabold text-[#C5A059] uppercase tracking-tighter mb-1">
               <span>통독 여정</span>
@@ -179,24 +177,20 @@ export default function BibleWrite({ onFinish }) {
           </div>
         </div>
 
-        {/* 메인 필사 카드 UI 유지 */}
         <div className="bg-white rounded-[2.5rem] shadow-2xl border border-[#E9DCC9] overflow-hidden">
           <div className="bg-[#C5A059] py-4 px-10 text-white flex justify-between items-center shadow-sm">
             <div className="flex items-center gap-3">
               <span className="text-xl font-serif font-bold tracking-tight">📖 {BIBLE_LIST[bookIndex].name} {currentBible.v}절</span>
             </div>
-            {/* [디자인부] 중복 기능 제거: 임시 저장 버튼 삭제 완료 */}
           </div>
 
           <div className="p-8 md:p-12">
-            {/* 원문 영역 디자인 유지 */}
             <div className="mb-10 text-center py-14 bg-[#F9F7F2]/60 rounded-[2.5rem] border border-[#E9DCC9]/40 shadow-inner">
               <p className="text-2xl md:text-3xl font-serif text-[#3A3A3A] leading-[1.8] px-8 select-none pointer-events-none font-medium opacity-95">
                 {currentBible.t}
               </p>
             </div>
             
-            {/* 입력 영역: 디자인부 오타 피드백 컬러셋 반영 */}
             <div className="relative">
               <textarea
                 value={userInput}
@@ -219,9 +213,9 @@ export default function BibleWrite({ onFinish }) {
               </div>
             </div>
 
-            {/* 하단 제어부 및 바통 터치 영역 UI 보존 */}
             <div className="mt-8 flex items-center justify-center gap-6 border-b border-[#E9DCC9] pb-10">
-              <button onClick={() => onFinish()} className="px-10 py-3.5 text-[#8b5e3c] font-bold hover:underline underline-offset-8 transition-all text-sm">잠시 멈추기</button>
+              {/* ⭐ [수정] 잠시 멈추기 버튼에 handleStopAndSave 함수 연결 */}
+              <button onClick={handleStopAndSave} className="px-10 py-3.5 text-[#8b5e3c] font-bold hover:underline underline-offset-8 transition-all text-sm">잠시 멈추기</button>
               <button 
                 disabled={!isVerseComplete} 
                 onClick={moveToNextVerse} 
