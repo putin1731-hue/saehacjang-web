@@ -24,7 +24,7 @@ export default function BibleWrite({ onFinish }) {
         setLoading(true);
         const target = BIBLE_LIST[bookIndex];
         const fileName = `${target.id}_${target.abbr}_01.json`;
-        const response = await fetch(`/data/bible/${fileName}`);
+        const response = await fetch(`/api/bible/${fileName}`);
         const data = await response.json();
         if (data?.verses) setBibleData(data.verses);
       } catch (error) {
