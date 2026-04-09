@@ -6,13 +6,12 @@ export default function Dashboard({ onNavigate }) {
   const [relayData, setRelayData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // [기술부 핵심: 실시간 동기화 엔진]
-  // 서버로부터 현재 주자, 남은 시간, 릴레이 상태를 30초마다 자동 갱신합니다.
   useEffect(() => {
     const fetchStatus = async () => {
       try {
         const response = await fetch('/api/relay/status');
-        const data = await res.json();
+        // [수정 1] res.json()이 아니라 response.json()입니다! (오타 수정)
+        const data = await response.json(); 
         setRelayData(data);
       } catch (e) {
         console.error("지휘부 서버 연결 실패: 실시간 데이터를 가져올 수 없습니다.");
@@ -22,11 +21,12 @@ export default function Dashboard({ onNavigate }) {
     };
 
     fetchStatus();
-    const interval = setInterval(fetchStatus, 30000); // 실시간 감시 유지
+    const interval = setInterval(fetchStatus, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  if (loading) return (
+  // [수정 2] 데이터가 없거나 로딩 중일 때 계산 로직으로 넘어가지 않도록 방어막 설치
+  if (loading || !relayData) return (
     <div className="min-h-screen bg-[#F9F7F2] flex items-center justify-center font-serif text-[#C5A059] animate-pulse">
       성소의 최신 기록을 동기화 중입니다...
     </div>
@@ -34,7 +34,8 @@ export default function Dashboard({ onNavigate }) {
 
   // [기술부: 정밀 시간 계산 로직]
   const calculateTime = () => {
-    const diff = relayData.timeLeft;
+    // 이제 relayData가 확실히 있을 때만 실행됩니다.
+    const diff = relayData.timeLeft || 0; 
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
     return { hours, minutes };
@@ -46,7 +47,7 @@ export default function Dashboard({ onNavigate }) {
     <div className="min-h-screen bg-[#F9F7F2] py-12 px-6 font-sans">
       <div className="max-w-5xl mx-auto">
         
-        {/* [디자인부] 상단 헤더 섹션 */}
+        {/* 상단 헤더 섹션 */}
         <div className="mb-12 text-center">
           <h1 className="text-4xl font-black text-[#3a2e24] font-serif tracking-tighter">릴레이 사역 현황</h1>
           <p className="text-[#8b5e3c] mt-3 italic font-serif opacity-80">"한 사람의 진심이 온 공동체의 고백이 됩니다"</p>
@@ -54,9 +55,8 @@ export default function Dashboard({ onNavigate }) {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* 1. [기능 통합] 실시간 주자 관제 카드 */}
+          {/* 1. 실시간 주자 관제 카드 */}
           <div className="lg:col-span-2 bg-white rounded-[2.5rem] shadow-xl border border-[#E9DCC9] p-10 relative overflow-hidden">
-            {/* 상태 표시 등 (ACTIVE / PENDING / VOID) */}
             <div className="absolute top-8 right-8">
               <span className={`px-4 py-1.5 rounded-full text-[10px] font-bold tracking-widest uppercase border 
                 ${relayData.status === 'ACTIVE' ? 'bg-green-50 text-green-600 border-green-200' : 'bg-[#FAF3F2] text-[#D29181] border-[#D29181] animate-pulse'}`}>
@@ -77,7 +77,6 @@ export default function Dashboard({ onNavigate }) {
               </div>
             </div>
 
-            {/* [기능 통합] 카운트다운 및 진도율 지표 */}
             <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-6 pt-10 border-t border-[#F9F7F2]">
               <div className="bg-[#F9F7F2]/50 p-6 rounded-3xl border border-[#E9DCC9]/30">
                 <p className="text-[10px] font-bold text-[#8b5e3c] uppercase mb-1">남은 은혜의 시간</p>
@@ -94,7 +93,7 @@ export default function Dashboard({ onNavigate }) {
             </div>
           </div>
 
-          {/* 2. [행정 규칙] 실시간 정책 공지 영역 */}
+          {/* 2. 행정 규칙 공지 영역 */}
           <div className="bg-[#3a2e24] rounded-[2.5rem] shadow-2xl p-10 text-white flex flex-col justify-between relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-[#C5A059]/10 rounded-full -mr-16 -mt-16"></div>
             <div>
@@ -122,7 +121,7 @@ export default function Dashboard({ onNavigate }) {
           </div>
         </div>
 
-        {/* 3. [UX 확장] 말씀의 여정 (Relay History) */}
+        {/* 3. 사역 히스토리 */}
         <div className="mt-10 bg-white rounded-[2.5rem] shadow-xl border border-[#E9DCC9] p-10">
           <div className="flex items-center justify-between mb-8">
             <h3 className="text-lg font-bold text-[#3a2e24] font-serif">🕊️ 사역 히스토리</h3>
