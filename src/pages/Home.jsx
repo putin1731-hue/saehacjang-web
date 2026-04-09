@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { worshipSchedule } from "../data/mockData";
 // 폴더 이름이 S로 시작한다면?
-import { SLIDES } from "../components/Slides/SlideScenes.jsx";
+import { SLIDES } from "../components/Slides/SlideScenes";
 
 export default function Home({ onNavigate }) {
   const [cur, setCur] = useState(0);
