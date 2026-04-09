@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 
 export default function Dashboard({ onNavigate }) {
-  const { user } = useAuth();
+  const { user } = useAuth(); // 관리자 체크를 위해 user 객체 사용
   const [relayData, setRelayData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -42,9 +42,22 @@ export default function Dashboard({ onNavigate }) {
     <div className="min-h-screen bg-[#F9F7F2] py-12 px-6 font-sans">
       <div className="max-w-5xl mx-auto">
         
-        <div className="mb-12 text-center">
-          <h1 className="text-4xl font-black text-[#3a2e24] font-serif tracking-tighter">릴레이 사역 현황</h1>
-          <p className="text-[#8b5e3c] mt-3 italic font-serif opacity-80">"한 사람의 진심이 온 공동체의 고백이 됩니다"</p>
+        {/* 상단 헤더 영역: 제목과 관리자 버튼 통합 */}
+        <div className="mb-12 flex flex-col md:flex-row md:justify-between md:items-end gap-6">
+          <div className="text-center md:text-left">
+            <h1 className="text-4xl font-black text-[#3a2e24] font-serif tracking-tighter">릴레이 사역 현황</h1>
+            <p className="text-[#8b5e3c] mt-3 italic font-serif opacity-80">"한 사람의 진심이 온 공동체의 고백이 됩니다"</p>
+          </div>
+
+          {/* ⭐ 관리자일 때만 비밀 버튼이 나타남 (디자인 최적화) */}
+          {user && user.role === 'admin' && (
+            <button 
+              onClick={() => onNavigate('pastor-office')} 
+              className="bg-[#3a2e24] text-[#C5A059] px-6 py-3 rounded-full text-xs font-bold border border-[#C5A059] hover:bg-[#C5A059] hover:text-white transition-all shadow-lg flex items-center justify-center gap-2 mx-auto md:mx-0"
+            >
+              🏛️ 관리자 관제 센터 입장
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -78,20 +91,19 @@ export default function Dashboard({ onNavigate }) {
                 </p>
               </div>
               
-              {/* ⭐ [수정 영역] '절수' 대신 '진행 상황' 이정표로 변경 */}
               <div className="bg-[#F9F7F2]/50 p-6 rounded-3xl border border-[#E9DCC9]/30">
-  <p className="text-[10px] font-bold text-[#8b5e3c] uppercase mb-1">현재 필사 진행 상황</p>
-  {/* ⭐ 글씨 크기를 줄이고(text-xl) 장(Chapter) 정보를 포함했습니다 */}
-  <p className="text-xl font-serif text-[#3a2e24] font-bold">
-    {relayData.currentBookName} {relayData.currentChapterNum}장 {relayData.currentVerseNum}절 진행 중
-  </p>
-  <p className="text-[10px] text-[#C5A059] mt-2 font-medium italic opacity-80">
-    * 우리 공동체가 {relayData.verseCount}구절을 함께 이어왔습니다.
-  </p>
-</div>
+                <p className="text-[10px] font-bold text-[#8b5e3c] uppercase mb-1">현재 필사 진행 상황</p>
+                <p className="text-xl font-serif text-[#3a2e24] font-bold">
+                  {relayData.currentBookName} {relayData.currentChapterNum}장 {relayData.currentVerseNum}절 진행 중
+                </p>
+                <p className="text-[10px] text-[#C5A059] mt-2 font-medium italic opacity-80">
+                  * 우리 공동체가 {relayData.verseCount}구절을 함께 이어왔습니다.
+                </p>
+              </div>
             </div>
           </div>
 
+          {/* 공지사항 섹션 */}
           <div className="bg-[#3a2e24] rounded-[2.5rem] shadow-2xl p-10 text-white flex flex-col justify-between relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-[#C5A059]/10 rounded-full -mr-16 -mt-16"></div>
             <div>
@@ -119,6 +131,7 @@ export default function Dashboard({ onNavigate }) {
           </div>
         </div>
 
+        {/* 히스토리 섹션 */}
         <div className="mt-10 bg-white rounded-[2.5rem] shadow-xl border border-[#E9DCC9] p-10">
           <div className="flex items-center justify-between mb-8">
             <h3 className="text-lg font-bold text-[#3a2e24] font-serif">🕊️ 사역 히스토리</h3>
