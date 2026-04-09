@@ -26,7 +26,7 @@ const MEMBERS = [
 ];
 
 /* ─────────────────────────────────────────
-   [지휘부 지시] 릴레이 상태 관리 엔진 (기존 유지)
+   [지휘부 지시] 릴레이 상태 관리 엔진
 ───────────────────────────────────────── */
 let relayStatus = {
     currentRunner: MEMBERS[0], 
@@ -34,12 +34,11 @@ let relayStatus = {
     deadline: Date.now() + (48 * 60 * 60 * 1000), 
     isConfirmed: true,
     status: "ACTIVE", 
-    verseCount: 0
+    verseCount: 0 // 성도님들이 필사한 총 구절 수가 여기에 기록됩니다.
 };
 
 /* ─────────────────────────────────────────
    [1단계: API 엔진 정의] 
-   - 서버가 화면(HTML)보다 먼저 읽어야 하는 핵심 데이터 통로입니다.
 ───────────────────────────────────────── */
 
 // 1. 상태 조회 API
@@ -59,7 +58,15 @@ app.post('/api/login', (req, res) => {
     user ? res.json({ success: true, user }) : res.status(401).json({ success: false, message: "명단 확인 불가" });
 });
 
-// 3. 지목하기 API
+// ⭐ 3. [신규] 필사 구절 카운트 업데이트 API
+// 성도님이 '필사 완료' 버튼을 누를 때 호출되어 숫자를 올립니다.
+app.post('/api/relay/update-verse', (req, res) => {
+    relayStatus.verseCount += 1;
+    console.log(`✨ 필사 기록 갱신: 현재 총 ${relayStatus.verseCount}구절`);
+    res.json({ success: true, newCount: relayStatus.verseCount });
+});
+
+// 4. 지목하기 API (기존 규칙 유지)
 app.post('/api/nominate', (req, res) => {
     const { nextName, nextPhone } = req.body;
     const nextRunner = MEMBERS.find(m => m.name === nextName && m.phone === nextPhone);
@@ -74,11 +81,12 @@ app.post('/api/nominate', (req, res) => {
         deadline: Date.now() + (24 * 60 * 60 * 1000),
         isConfirmed: false,
         status: "PENDING"
+        // verseCount는 초기화하지 않고 누적 기록을 유지합니다.
     };
     res.json({ success: true, message: "바통 전달 완료" });
 });
 
-// 4. 성경 말씀 보급로 API (public/data/bible)
+// 5. 성경 말씀 보급로 API
 app.get('/api/bible/:fileName', (req, res) => {
     const { fileName } = req.params;
     const biblePath = path.resolve(__dirname, 'data', 'bible', fileName);
@@ -93,20 +101,16 @@ app.get('/api/bible/:fileName', (req, res) => {
 
 /* ─────────────────────────────────────────
    [2단계: 정적 파일 및 화면 연결] 
-   - API 주소가 아닌 모든 요청은 여기서 처리됩니다.
 ───────────────────────────────────────── */
-
-// 빌드된 리액트 파일(dist) 위치 확정
 const buildPath = path.resolve(__dirname, 'dist');
 app.use(express.static(buildPath));
 
-// 그 외 모든 경로는 리액트의 메인 화면(index.html)으로 연결
 app.get('*', (req, res) => {
     res.sendFile(path.join(buildPath, 'index.html'));
 });
 
 /* ─────────────────────────────────────────
-   [3단계: Watcher] 타임아웃 감시 (기존 유지)
+   [3단계: Watcher] 타임아웃 감시 (1분마다)
 ───────────────────────────────────────── */
 cron.schedule('* * * * *', () => {
     if (Date.now() > relayStatus.deadline && !relayStatus.isConfirmed) {
@@ -115,5 +119,5 @@ cron.schedule('* * * * *', () => {
 });
 
 app.listen(PORT, () => {
-    console.log(`🚀 Server Running on Port ${PORT}`);
+    console.log(`🚀 Server Running on Port ${PORT} with Auto-Counter`);
 });
