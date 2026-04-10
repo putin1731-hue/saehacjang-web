@@ -8,45 +8,43 @@ export default function AdminDashboard() {
   const [relayStatus, setRelayStatus] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 1. [보강] 목사님 전용 실시간 데이터 로드 (서버 에러 방어막 장착)
+  // 1. [핵심 수정] 에러 방지용 안전 데이터 로드
   const fetchAdminData = async () => {
     try {
       setLoading(true);
       
-      // A. 서버 API 호출 시도 (실패해도 중단되지 않도록 개별 catch 처리)
-      const userRes = await fetch('/api/admin/users').catch(() => null);
-      const relayRes = await fetch('/api/relay/status').catch(() => null);
+      // [수정] 서버 API 호출 시 데이터가 아니면(HTML이면) 무시하도록 방어막을 칩니다.
+      const safeFetch = async (url) => {
+        try {
+          const res = await fetch(url);
+          // 컨텐츠 타입이 JSON일 때만 읽습니다. (<!doctype... 에러 방지)
+          if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+            return await res.json();
+          }
+          return null;
+        } catch (e) { return null; }
+      };
 
-      if (userRes && userRes.ok) {
-        const users = await userRes.json();
-        setPendingUsers(users.filter(u => u.status === "PENDING"));
-      } else {
-        setPendingUsers([]); // 서버 응답 없으면 빈 배열
-      }
+      const users = await safeFetch('/api/admin/users');
+      const relay = await safeFetch('/api/relay/status');
 
-      if (relayRes && relayRes.ok) {
-        const relay = await relayRes.json();
-        setRelayStatus(relay);
-      }
+      if (users) setPendingUsers(users.filter(u => u.status === "PENDING"));
+      if (relay) setRelayStatus(relay);
 
-      // B. [핵심] 기도 데이터 가져오기 (가장 중요한 부분!)
+      // 2. [가장 중요] 기도 데이터 가져오기
+      // 서버 에러와 상관없이 우리 서비스(localStorage)에서 데이터를 가져옵니다.
       const dbPrayers = await prayerService.getAllPrayers();
       
-      // 서비스 결과가 성공이고 데이터가 있다면 상태 업데이트
       if (dbPrayers && dbPrayers.success && Array.isArray(dbPrayers.data)) {
         setPrayers(dbPrayers.data);
       } else {
-        // [비상 로직] 서비스 로직이 꼬였을 경우를 대비해 직접 금고(Storage)를 강제 확인
-        const fallbackData = localStorage.getItem('saehacjang_prayers');
-        if (fallbackData) {
-          setPrayers(JSON.parse(fallbackData));
-        } else {
-          setPrayers([]); 
-        }
+        // 비상시 직접 금고 확인
+        const fallback = localStorage.getItem('saehacjang_prayers');
+        setPrayers(fallback ? JSON.parse(fallback) : []);
       }
 
     } catch (e) {
-      console.error("데이터 로드 중 치명적 에러:", e);
+      console.error("데이터 로드 중 안전 모드 가동:", e);
     } finally {
       setLoading(false);
     }
@@ -56,7 +54,7 @@ export default function AdminDashboard() {
     fetchAdminData();
   }, []);
 
-  // 2. 가입 승인 처리 로직 (기존 유지)
+  // --- 아래 디자인 및 승인 로직은 기획관님의 코드 그대로 유지됩니다 ---
   const handleUserApproval = async (userId, decision) => {
     if (!window.confirm(`${decision === 'ACTIVE' ? '승인' : '반려'} 하시겠습니까?`)) return;
     const result = await authService.updateUserStatus(userId, decision);
@@ -78,8 +76,6 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-[#F3F4F6] p-8 font-sans">
       <div className="max-w-7xl mx-auto">
-        
-        {/* 상단 헤더: 수동 새로고침 버튼 추가 (기존 디자인 유지) */}
         <div className="flex justify-between items-center mb-10 bg-[#3a2e24] p-8 rounded-[2rem] text-white shadow-2xl">
           <div>
             <h1 className="text-3xl font-black font-serif tracking-tight">🏛️ 사역 관제 센터</h1>
@@ -87,17 +83,13 @@ export default function AdminDashboard() {
           </div>
           <div className="flex flex-col items-end gap-3">
             <span className="bg-[#C5A059] px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest">Administrator Mode</span>
-            <button 
-              onClick={fetchAdminData}
-              className="text-xs text-white/60 hover:text-white transition-colors flex items-center gap-1 active:scale-95"
-            >
+            <button onClick={fetchAdminData} className="text-xs text-white/60 hover:text-white transition-colors flex items-center gap-1 active:scale-95">
               🔄 실시간 데이터 갱신
             </button>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* [좌측] 가입 승인 대기소 (기존 유지) */}
           <div className="bg-white rounded-[2rem] p-8 shadow-lg border border-gray-200">
             <h3 className="text-xl font-bold text-[#3a2e24] mb-6 flex items-center gap-2">
               👤 신규 가입 승인 대기 <span className="text-sm bg-red-100 text-red-600 px-2 py-0.5 rounded-full">{pendingUsers.length}</span>
@@ -122,7 +114,6 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* [우측] 필사 현황 (기존 유지) */}
           <div className="bg-white rounded-[2rem] p-8 shadow-lg border border-gray-200">
             <h3 className="text-xl font-bold text-[#3a2e24] mb-6">📖 필사 사역 실시간 현황</h3>
             {relayStatus ? (
@@ -149,7 +140,6 @@ export default function AdminDashboard() {
             )}
           </div>
 
-          {/* [하단 전체] 기도 제목 확인소 (실제 데이터 노출) */}
           <div className="lg:col-span-2 bg-white rounded-[2rem] p-8 shadow-lg border border-gray-200">
             <h3 className="text-xl font-bold text-[#3a2e24] mb-6 flex items-center gap-2">
               🕊️ 중보 기도 요청 (목사님 전용 실명 모드)
@@ -173,9 +163,7 @@ export default function AdminDashboard() {
                         <td className="p-4 font-bold text-[#3a2e24]">{p.authorName}</td>
                         <td className="p-4 text-gray-600 break-keep">{p.content}</td>
                         <td className="p-4 text-sm text-[#C5A059] font-medium">{p.authorPhone}</td>
-                        <td className="p-4 text-xs text-gray-400">
-                          {p.createdAt ? new Date(p.createdAt).toLocaleDateString() : "-"}
-                        </td>
+                        <td className="p-4 text-xs text-gray-400">{p.createdAt ? new Date(p.createdAt).toLocaleDateString() : "-"}</td>
                       </tr>
                     ))}
                   </tbody>
