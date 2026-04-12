@@ -65,10 +65,10 @@ export default function Home({ onNavigate }) {
           </div>
         </div>
 
-        {/* [디자인부] 오른쪽 날개: 교회 소식 및 신청 (가정의 달 교체 버전) */}
+{/* [디자인부] 오른쪽 날개: 교회 소식 및 신청 (최적화 버전) */}
 <div className="fixed right-0 top-1/2 -translate-y-1/2 hidden xl:flex flex-col gap-4 z-50">
   
-  {/* 새로운 시즌 배너: 가정의 달 감사 예배 */}
+  {/* 1. 새로운 시즌 배너: 가정의 달 감사 예배 */}
   <div className="bg-gradient-to-br from-white/95 to-[#fff5f5]/95 backdrop-blur-sm p-4 rounded-l-[20px] shadow-xl border-l border-y border-white/60 w-40 transition-all hover:-translate-x-3 hover:shadow-2xl group cursor-pointer">
     <span className="text-[8px] bg-[#d29181] text-white px-2 py-0.5 rounded-full font-black tracking-tighter uppercase">Family Month</span>
     <h3 className="mt-2 font-bold text-[#5d4037] text-xs leading-tight group-hover:text-[#d29181] transition-colors">
@@ -77,7 +77,7 @@ export default function Home({ onNavigate }) {
     <p className="text-[10px] text-[#8b5e3c] mt-1 opacity-80 font-medium">5.10 | 시온 동산</p>
   </div>
 
-  {/* 사역 신청 배너: 성경 필사 릴레이 (유지하되 문구 보정) */}
+  {/* 2. 핵심 사역 배너: 성경 필사 릴레이 (준혁 팀장님 수정안 반영) */}
   <div className="bg-[#3a2e24] p-4 rounded-l-[20px] shadow-xl border-l border-y border-white/10 w-40 transition-all hover:-translate-x-4 hover:shadow-[0_15px_30px_rgba(0,0,0,0.3)]">
     <h3 className="font-bold text-white text-xs">말씀의 숲, 필사 참여</h3>
     <p className="text-[10px] text-white/60 mt-0.5">현재 15팀 동행 중</p>
@@ -85,23 +85,27 @@ export default function Home({ onNavigate }) {
       onClick={() => onNavigate('apply')} 
       className="mt-3 w-full py-2 bg-[#c8923a] text-white text-[10px] rounded-lg font-bold hover:bg-white hover:text-[#3a2e24] transition-all shadow-md active:scale-95"
     >
-      신청하기 ➔
+      참여하기 ➔
     </button>
   </div>
 
+  {/* 3. [재량 추가] 새가족 등록 및 안내 배너 */}
+  <div className="bg-white/90 backdrop-blur-sm p-4 rounded-l-[20px] shadow-lg border-l border-y border-[#e9dcc9] w-40 transition-all hover:-translate-x-3 hover:shadow-xl group cursor-pointer">
+    <div className="flex items-center gap-2 mb-1">
+      <span className="text-xs">🌿</span>
+      <span className="text-[9px] text-[#c8923a] font-bold tracking-widest uppercase">Welcome</span>
+    </div>
+    <h3 className="font-bold text-[#3a2e24] text-xs leading-tight">처음 오셨나요?</h3>
+    <p className="text-[9px] text-gray-500 mt-1 leading-tight">새학장 공동체의 가족이 되는 길을 안내합니다.</p>
+    <button 
+      onClick={() => onNavigate('signup')} 
+      className="mt-2 text-[9px] text-[#c8923a] font-bold border-b border-[#c8923a] pb-0.5"
+    >
+      새가족 등록 안내 ➔
+    </button>
+  </div>
 
-          <div className="bg-[#3a2e24] p-4 rounded-l-[20px] shadow-xl border-l border-y border-white/10 w-40 transition-all hover:-translate-x-4 hover:shadow-[0_15px_30px_rgba(0,0,0,0.3)]">
-            <h3 className="font-bold text-white text-xs">성경 필사 릴레이</h3>
-            <p className="text-[10px] text-white/60 mt-0.5">12팀 참여 중</p>
-            {/* [수정] apply 페이지가 없는 경우를 대비해 회원가입(signup)으로 연결 */}
-            <button 
-              onClick={() => onNavigate('signup')} 
-              className="mt-3 w-full py-2 bg-[#c8923a] text-white text-[10px] rounded-lg font-bold hover:bg-white hover:text-[#3a2e24] transition-all shadow-md active:scale-95"
-            >
-              참여하기 ➔
-            </button>
-          </div>
-        </div>
+</div>
 
         {/* 중앙 메인 텍스트 */}
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center pb-60 pointer-events-none">
