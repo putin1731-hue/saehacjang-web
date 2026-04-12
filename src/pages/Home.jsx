@@ -65,13 +65,30 @@ export default function Home({ onNavigate }) {
           </div>
         </div>
 
-        {/* 오른쪽 날개: 교회 소식 및 신청 */}
-        <div className="fixed right-0 top-1/2 -translate-y-1/2 hidden xl:flex flex-col gap-4 z-50">
-          <div className="bg-gradient-to-br from-white/95 to-[#fdf8f2]/95 backdrop-blur-sm p-4 rounded-l-[20px] shadow-xl border-l border-y border-white/60 w-40 transition-all hover:-translate-x-3 hover:shadow-2xl group">
-            <span className="text-[8px] bg-[#c8923a] text-white px-2 py-0.5 rounded-full font-black tracking-tighter">ANNIVERSARY</span>
-            <h3 className="mt-2 font-bold text-[#3a2e24] text-xs leading-tight group-hover:text-[#c8923a] transition-colors">새학장 부활절 축제</h3>
-            <p className="text-[10px] text-[#8b5e3c] mt-1 opacity-80 font-medium">4.12 | 대예배실</p>
-          </div>
+        {/* [디자인부] 오른쪽 날개: 교회 소식 및 신청 (가정의 달 교체 버전) */}
+<div className="fixed right-0 top-1/2 -translate-y-1/2 hidden xl:flex flex-col gap-4 z-50">
+  
+  {/* 새로운 시즌 배너: 가정의 달 감사 예배 */}
+  <div className="bg-gradient-to-br from-white/95 to-[#fff5f5]/95 backdrop-blur-sm p-4 rounded-l-[20px] shadow-xl border-l border-y border-white/60 w-40 transition-all hover:-translate-x-3 hover:shadow-2xl group cursor-pointer">
+    <span className="text-[8px] bg-[#d29181] text-white px-2 py-0.5 rounded-full font-black tracking-tighter uppercase">Family Month</span>
+    <h3 className="mt-2 font-bold text-[#5d4037] text-xs leading-tight group-hover:text-[#d29181] transition-colors">
+      가정의 달 감사 예배
+    </h3>
+    <p className="text-[10px] text-[#8b5e3c] mt-1 opacity-80 font-medium">5.10 | 시온 동산</p>
+  </div>
+
+  {/* 사역 신청 배너: 성경 필사 릴레이 (유지하되 문구 보정) */}
+  <div className="bg-[#3a2e24] p-4 rounded-l-[20px] shadow-xl border-l border-y border-white/10 w-40 transition-all hover:-translate-x-4 hover:shadow-[0_15px_30px_rgba(0,0,0,0.3)]">
+    <h3 className="font-bold text-white text-xs">말씀의 숲, 필사 참여</h3>
+    <p className="text-[10px] text-white/60 mt-0.5">현재 15팀 동행 중</p>
+    <button 
+      onClick={() => onNavigate('apply')} 
+      className="mt-3 w-full py-2 bg-[#c8923a] text-white text-[10px] rounded-lg font-bold hover:bg-white hover:text-[#3a2e24] transition-all shadow-md active:scale-95"
+    >
+      신청하기 ➔
+    </button>
+  </div>
+
 
           <div className="bg-[#3a2e24] p-4 rounded-l-[20px] shadow-xl border-l border-y border-white/10 w-40 transition-all hover:-translate-x-4 hover:shadow-[0_15px_30px_rgba(0,0,0,0.3)]">
             <h3 className="font-bold text-white text-xs">성경 필사 릴레이</h3>
