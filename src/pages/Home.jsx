@@ -79,15 +79,25 @@ export default function Home({ onNavigate }) {
 
   {/* 2. 핵심 사역 배너: 성경 필사 릴레이 (준혁 팀장님 수정안 반영) */}
   <div className="bg-[#3a2e24] p-4 rounded-l-[20px] shadow-xl border-l border-y border-white/10 w-40 transition-all hover:-translate-x-4 hover:shadow-[0_15px_30px_rgba(0,0,0,0.3)]">
-    <h3 className="font-bold text-white text-xs">말씀의 숲, 필사 참여</h3>
-    <p className="text-[10px] text-white/60 mt-0.5">현재 15팀 동행 중</p>
-    <button 
-      onClick={() => onNavigate('Dashboard')} 
-      className="mt-3 w-full py-2 bg-[#c8923a] text-white text-[10px] rounded-lg font-bold hover:bg-white hover:text-[#3a2e24] transition-all shadow-md active:scale-95"
-    >
-      참여하기 ➔
-    </button>
-  </div>
+  <h3 className="font-bold text-white text-xs">말씀의 숲, 필사 참여</h3>
+  
+  {/* [변경] 로그인 상태에 따른 안내 문구 변화 */}
+  <p className="text-[10px] text-white/60 mt-0.5">
+    {currentUser ? `${currentUser.name} 성도님 환영합니다` : "현재 15팀 동행 중"}
+  </p>
+
+  <button 
+    onClick={() => onNavigate('Dashboard')} 
+    className={`mt-3 w-full py-2 text-[10px] rounded-lg font-bold transition-all shadow-md active:scale-95 
+      ${currentUser 
+        ? "bg-white text-[#3a2e24] hover:bg-[#c8923a] hover:text-white" // 로그인 시: 밝은색 강조
+        : "bg-[#c8923a] text-white hover:bg-white hover:text-[#3a2e24]" // 미로그인 시: 기존 디자인
+      }`}
+  >
+    {/* [변경] 로그인 상태에 따른 버튼 문구 변화 */}
+    {currentUser ? "나의 필사 이어가기 ➔" : "참여하기 ➔"}
+  </button>
+</div>
 
   {/* 3. [재량 추가] 새가족 등록 및 안내 배너 */}
   <div className="bg-white/90 backdrop-blur-sm p-4 rounded-l-[20px] shadow-lg border-l border-y border-[#e9dcc9] w-40 transition-all hover:-translate-x-3 hover:shadow-xl group cursor-pointer">
