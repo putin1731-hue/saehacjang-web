@@ -171,5 +171,6 @@ export default function Home({ onNavigate, currentUser = null }) {
         <p className="text-xs tracking-widest font-light">© 2026 SAE HAKJANG CHURCH. ALL RIGHTS RESERVED.</p>
       </footer>
     </div>
+    
   );
 }
