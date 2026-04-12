@@ -57,9 +57,9 @@ export default function Home({ onNavigate }) {
               <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-100">
                 <p className="text-[10px] uppercase tracking-widest text-[#c8923a] font-black mb-1">Weekly Word</p>
                 <p className="text-sm text-[#3a2e24] font-serif leading-tight italic">
-                  "주의 말씀은 내 발에 등이요<br/>내 길에 빛이니이다"
+                  "나의 평안을 너희에게 주노라<br/>내가 주는 것은 세상과 같지 아니하니라"
                 </p>
-                <p className="text-[10px] text-[#8b5e3c] mt-2 font-bold">— 시편 119:105</p>
+                <p className="text-[10px] text-[#8b5e3c] mt-2 font-bold">— 요한복음 14:27</p>
               </div>
             </div>
           </div>
