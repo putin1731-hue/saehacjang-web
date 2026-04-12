@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { SLIDES } from "../components/slides/SlideScenes";
 import { worshipSchedule } from "../data/mockData";
 
-export default function Home({ onNavigate }) {
+export default function Home({ onNavigate, currentUser = null }) {
   const [cur, setCur] = useState(0);
   const timerRef = useRef(null);
 
@@ -10,7 +10,7 @@ export default function Home({ onNavigate }) {
     setCur(n);
   }, []);
 
-  // [수정] 슬라이드 자동 재생 (20초 간격)
+  // 슬라이드 자동 재생 (20초 간격)
   useEffect(() => {
     timerRef.current = setInterval(() => {
       setCur((c) => (c + 1) % SLIDES.length);
@@ -18,7 +18,7 @@ export default function Home({ onNavigate }) {
     return () => clearInterval(timerRef.current);
   }, []);
 
-  // 예배 안내 카드 컴포넌트
+  // 예배 안내 카드 컴포넌트 (디자인 복구)
   const WorshipCard = ({ item }) => (
     <div className="rounded-[14px] p-[1.6rem_1.4rem] border border-[#e9dcc9] bg-white transition-all hover:-translate-y-1 hover:shadow-md group">
       <p className="text-sm text-gray-500">{item.label}</p>
@@ -49,7 +49,7 @@ export default function Home({ onNavigate }) {
           </div>
         ))}
 
-        {/* 왼쪽 날개: 말씀 카드 */}
+        {/* [복구] 왼쪽 날개: 말씀 카드 */}
         <div className="fixed left-0 top-1/2 -translate-y-1/2 hidden lg:flex flex-col z-50">
           <div className="group bg-white/20 backdrop-blur-md border-r border-y border-white/40 p-4 rounded-r-3xl shadow-2xl w-14 hover:w-80 transition-all duration-700 ease-in-out overflow-hidden cursor-default">
             <div className="flex items-center gap-5 whitespace-nowrap">
@@ -65,59 +65,51 @@ export default function Home({ onNavigate }) {
           </div>
         </div>
 
-{/* [디자인부] 오른쪽 날개: 교회 소식 및 신청 (최적화 버전) */}
-<div className="fixed right-0 top-1/2 -translate-y-1/2 hidden xl:flex flex-col gap-4 z-50">
-  
-  {/* 1. 새로운 시즌 배너: 가정의 달 감사 예배 */}
-  <div className="bg-gradient-to-br from-white/95 to-[#fff5f5]/95 backdrop-blur-sm p-4 rounded-l-[20px] shadow-xl border-l border-y border-white/60 w-40 transition-all hover:-translate-x-3 hover:shadow-2xl group cursor-pointer">
-    <span className="text-[8px] bg-[#d29181] text-white px-2 py-0.5 rounded-full font-black tracking-tighter uppercase">Family Month</span>
-    <h3 className="mt-2 font-bold text-[#5d4037] text-xs leading-tight group-hover:text-[#d29181] transition-colors">
-      가정의 달 감사 예배
-    </h3>
-    <p className="text-[10px] text-[#8b5e3c] mt-1 opacity-80 font-medium">5.10 | 시온 동산</p>
-  </div>
+        {/* [복구 및 수정] 오른쪽 날개: 교회 소식 및 신청 */}
+        <div className="fixed right-0 top-1/2 -translate-y-1/2 hidden xl:flex flex-col gap-4 z-50">
+          
+          {/* 1. 시즌 배너 (애니메이션 효과 복구) */}
+          <div className="bg-gradient-to-br from-white/95 to-[#fff5f5]/95 backdrop-blur-sm p-4 rounded-l-[20px] shadow-xl border-l border-y border-white/60 w-40 transition-all hover:-translate-x-3 hover:shadow-2xl group cursor-pointer">
+            <span className="text-[8px] bg-[#d29181] text-white px-2 py-0.5 rounded-full font-black tracking-tighter uppercase">Family Month</span>
+            <h3 className="mt-2 font-bold text-[#5d4037] text-xs leading-tight group-hover:text-[#d29181] transition-colors">가정의 달 감사 예배</h3>
+            <p className="text-[10px] text-[#8b5e3c] mt-1 opacity-80 font-medium">5.10 | 시온 동산</p>
+          </div>
 
-  {/* 2. 핵심 사역 배너: 성경 필사 릴레이 (준혁 팀장님 수정안 반영) */}
-  <div className="bg-[#3a2e24] p-4 rounded-l-[20px] shadow-xl border-l border-y border-white/10 w-40 transition-all hover:-translate-x-4 hover:shadow-[0_15px_30px_rgba(0,0,0,0.3)]">
-  <h3 className="font-bold text-white text-xs">말씀의 숲, 필사 참여</h3>
-  
-  {/* [변경] 로그인 상태에 따른 안내 문구 변화 */}
-  <p className="text-[10px] text-white/60 mt-0.5">
-    {currentUser ? `${currentUser.name} 성도님 환영합니다` : "현재 15팀 동행 중"}
-  </p>
+          {/* 2. 핵심 사역 배너 (currentUser 안전 처리 적용) */}
+          <div className="bg-[#3a2e24] p-4 rounded-l-[20px] shadow-xl border-l border-y border-white/10 w-40 transition-all hover:-translate-x-4 hover:shadow-[0_15px_30px_rgba(0,0,0,0.3)]">
+            <h3 className="font-bold text-white text-xs">말씀의 숲, 필사 참여</h3>
+            <p className="text-[10px] text-white/60 mt-0.5">
+              {currentUser ? `${currentUser.name} 성도님 동행 중` : "현재 15팀 동행 중"}
+            </p>
+            <button 
+              onClick={() => onNavigate('Dashboard')} 
+              className={`mt-3 w-full py-2 text-[10px] rounded-lg font-bold transition-all shadow-md active:scale-95 
+                ${currentUser 
+                  ? "bg-white text-[#3a2e24] hover:bg-[#c8923a] hover:text-white" 
+                  : "bg-[#c8923a] text-white hover:bg-white hover:text-[#3a2e24]"}`}
+            >
+              {currentUser ? "이어가기 ➔" : "참여하기 ➔"}
+            </button>
+          </div>
 
-  <button 
-    onClick={() => onNavigate('Dashboard')} 
-    className={`mt-3 w-full py-2 text-[10px] rounded-lg font-bold transition-all shadow-md active:scale-95 
-      ${currentUser 
-        ? "bg-white text-[#3a2e24] hover:bg-[#c8923a] hover:text-white" // 로그인 시: 밝은색 강조
-        : "bg-[#c8923a] text-white hover:bg-white hover:text-[#3a2e24]" // 미로그인 시: 기존 디자인
-      }`}
-  >
-    {/* [변경] 로그인 상태에 따른 버튼 문구 변화 */}
-    {currentUser ? "나의 필사 이어가기 ➔" : "참여하기 ➔"}
-  </button>
-</div>
+          {/* 3. 새가족 등록 배너 (디자인 복구) */}
+          <div className="bg-white/90 backdrop-blur-sm p-4 rounded-l-[20px] shadow-lg border-l border-y border-[#e9dcc9] w-40 transition-all hover:-translate-x-3 hover:shadow-xl group cursor-pointer">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs">🌿</span>
+              <span className="text-[9px] text-[#c8923a] font-bold tracking-widest uppercase">Welcome</span>
+            </div>
+            <h3 className="font-bold text-[#3a2e24] text-xs leading-tight">처음 오셨나요?</h3>
+            <p className="text-[9px] text-gray-500 mt-1 leading-tight">새학장 공동체의 가족이 되는 길을 안내합니다.</p>
+            <button 
+              onClick={() => onNavigate('signup')} 
+              className="mt-2 text-[9px] text-[#c8923a] font-bold border-b border-[#c8923a] pb-0.5"
+            >
+              새가족 등록 안내 ➔
+            </button>
+          </div>
+        </div>
 
-  {/* 3. [재량 추가] 새가족 등록 및 안내 배너 */}
-  <div className="bg-white/90 backdrop-blur-sm p-4 rounded-l-[20px] shadow-lg border-l border-y border-[#e9dcc9] w-40 transition-all hover:-translate-x-3 hover:shadow-xl group cursor-pointer">
-    <div className="flex items-center gap-2 mb-1">
-      <span className="text-xs">🌿</span>
-      <span className="text-[9px] text-[#c8923a] font-bold tracking-widest uppercase">Welcome</span>
-    </div>
-    <h3 className="font-bold text-[#3a2e24] text-xs leading-tight">처음 오셨나요?</h3>
-    <p className="text-[9px] text-gray-500 mt-1 leading-tight">새학장 공동체의 가족이 되는 길을 안내합니다.</p>
-    <button 
-      onClick={() => onNavigate('signup')} 
-      className="mt-2 text-[9px] text-[#c8923a] font-bold border-b border-[#c8923a] pb-0.5"
-    >
-      새가족 등록 안내 ➔
-    </button>
-  </div>
-
-</div>
-
-        {/* 중앙 메인 텍스트 */}
+        {/* [복구] 중앙 메인 텍스트 */}
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center pb-60 pointer-events-none">
           <h1 className="text-6xl font-black text-[#764d03] tracking-tighter font-sans drop-shadow-sm leading-none">
             새학장 교회
@@ -131,7 +123,7 @@ export default function Home({ onNavigate }) {
           </div>
         </div>
 
-        {/* 하단 점(Indicator) 네비게이션 */}
+        {/* [복구] 하단 인디케이터 */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-3 z-20">
           {SLIDES.map((_, i) => (
             <button
@@ -144,7 +136,7 @@ export default function Home({ onNavigate }) {
           ))}
         </div>
 
-        {/* 우측 수직 슬라이드 바 */}
+        {/* [복구] 우측 수직 슬라이드 바 */}
         <div className="absolute top-1/2 right-8 -translate-y-1/2 hidden sm:flex flex-col gap-3 z-20">
           {SLIDES.map((_, i) => (
             <button
@@ -158,7 +150,7 @@ export default function Home({ onNavigate }) {
         </div>
       </section>
 
-      {/* 예배 안내 섹션 */}
+      {/* 예배 안내 섹션 (복구) */}
       <section className="bg-[#f9f2e8] py-24 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-[#e9dcc9] to-transparent"></div>
         <div className="max-w-5xl mx-auto px-6 relative z-10">
