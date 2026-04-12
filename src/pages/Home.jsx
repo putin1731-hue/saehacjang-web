@@ -82,7 +82,7 @@ export default function Home({ onNavigate }) {
     <h3 className="font-bold text-white text-xs">말씀의 숲, 필사 참여</h3>
     <p className="text-[10px] text-white/60 mt-0.5">현재 15팀 동행 중</p>
     <button 
-      onClick={() => onNavigate('apply')} 
+      onClick={() => onNavigate('Dashboard')} 
       className="mt-3 w-full py-2 bg-[#c8923a] text-white text-[10px] rounded-lg font-bold hover:bg-white hover:text-[#3a2e24] transition-all shadow-md active:scale-95"
     >
       참여하기 ➔
