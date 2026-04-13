@@ -14,29 +14,42 @@ app.use(cors());
 app.use(express.json());
 
 /* ─────────────────────────────────────────
-    [행정부] 신도 명단 (role 및 status 필드 이식)
+    [행정부] 신도 명단 (목사님/기획관님 권한 분리)
 ───────────────────────────────────────── */
 const MEMBERS = [
     { 
       id: 1, 
-      name: "이준혁", 
-      phone: "01012345678", 
-      role: "admin",    // ⭐ 관리자 권한 부여
-      status: "ACTIVE", // ⭐ 활동 상태 부여
+      name: "황의종",         // ⭐ 목사님: 관리자(admin)
+      phone: "01025530691", 
+      role: "admin", 
+      status: "ACTIVE", 
+      activeTeams: 0 
+    },
+    { 
+      id: 2, 
+      name: "이준혁",         // ⭐ 기획관님: 유저(user) - 대시보드에서 사생활 보호 모드 작동
+      phone: "01051581731", 
+      role: "user", 
+      status: "ACTIVE", 
       activeTeams: 1 
     },
-    { id: 2, name: "김성도", phone: "01011112222", role: "user", status: "ACTIVE", activeTeams: 0 },
-    { id: 3, name: "조열심", phone: "01033334444", role: "user", status: "ACTIVE", activeTeams: 2 }, 
-    { id: 4, name: "박교우", phone: "01055556666", role: "user", status: "ACTIVE", activeTeams: 1 },
-    { id: 5, name: "최집사", phone: "01099990000", role: "user", status: "ACTIVE", activeTeams: 1 },
-    { id: 6, name: "박교우", phone: "01077778888", role: "user", status: "ACTIVE", activeTeams: 0 } 
+    { id: 3, name: "김성도", phone: "01011112222", role: "user", status: "ACTIVE", activeTeams: 0 },
+    { id: 4, name: "조열심", phone: "01033334444", role: "user", status: "ACTIVE", activeTeams: 2 }, 
+    { id: 5, name: "박교우", phone: "01055556666", role: "user", status: "ACTIVE", activeTeams: 1 },
+    { id: 6, name: "최집사", phone: "01099990000", role: "user", status: "ACTIVE", activeTeams: 1 } 
+];
+
+// [보강] 기도 제목 데이터 보관소
+let PRAYERS = [
+  { id: 1, content: "새학장 교회의 부흥을 위해 기도합니다.", authorName: "황의종", authorPhone: "01025530691", createdAt: new Date().toISOString() },
+  { id: 2, content: "성경 필사 사역이 은혜롭게 진행되길 원합니다.", authorName: "이준혁", authorPhone: "01051581731", createdAt: new Date().toISOString() }
 ];
 
 /* ─────────────────────────────────────────
-    [지휘부] 릴레이 상태 및 미션 관리
+    [지휘부] 릴레이 상태 및 미션 관리 (기존 엔진)
 ───────────────────────────────────────── */
 let relayStatus = {
-    currentRunner: MEMBERS[0], 
+    currentRunner: MEMBERS[1], // 이준혁 기획관님을 첫 주자로 설정
     previousRunnerId: null,
     deadline: Date.now() + (48 * 60 * 60 * 1000), 
     isConfirmed: true,
@@ -49,7 +62,7 @@ let relayStatus = {
 };
 
 /* ─────────────────────────────────────────
-    [기술부] 핵심 로직 엔진 (중복 차단 & 유형 분기)
+    [기술부] 핵심 로직 엔진 (기존 기능 100% 유지)
 ───────────────────────────────────────── */
 
 const getActiveMissionCount = (phone) => {
@@ -57,39 +70,46 @@ const getActiveMissionCount = (phone) => {
     return user ? user.activeTeams : 0;
 };
 
-// 사역 신청 API
+// 사역 신청 API (기존 유지)
 app.post('/api/mission/apply', (req, res) => {
     const { applicant, type, teamMembers } = req.body;
-
     if (getActiveMissionCount(applicant.phone) >= 2) {
         return res.status(403).json({ success: false, message: "사역 제한: 이미 2개의 미션에 참여 중입니다." });
     }
-
     if (type === "TEAM" && teamMembers) {
         const overLimitMember = teamMembers.find(m => getActiveMissionCount(m.phone) >= 2);
         if (overLimitMember) {
             return res.status(403).json({ success: false, message: `미션 초과 유저 포함: ${overLimitMember.name} 성도님` });
         }
     }
-
     res.json({ success: true, message: "사역 신청 접수 완료 (목사님 승인 대기)" });
 });
 
-// 목사님 승인 API (Admin 전용 로직이 들어갈 곳)
+// 목사님 승인 API (기존 유지)
 app.post('/api/admin/approve', (req, res) => {
-    const { missionId, type } = req.body;
-    
+    const { type } = req.body;
     if (type === "TEAM") {
-        console.log("🚀 팀 릴레이 엔진 가동: 24/48시간 타이머 적용");
         relayStatus.deadline = Date.now() + (48 * 60 * 60 * 1000);
     } else {
-        console.log("🕊️ 개인 사역 엔진 가동: 자율 기간제 적용");
         relayStatus.deadline = Date.now() + (365 * 24 * 60 * 60 * 1000); 
     }
-    
     relayStatus.type = type;
     relayStatus.status = "ACTIVE";
     res.json({ success: true, message: `${type} 사역이 공식 승인되었습니다.` });
+});
+
+/* ─────────────────────────────────────────
+    [보강 API] 관제 센터 및 기도 사역 지원
+───────────────────────────────────────── */
+
+// 1. 관리자용 전체 신도 명단 조회 (AdminDashboard 로드용)
+app.get('/api/admin/users', (req, res) => {
+    res.json(MEMBERS);
+});
+
+// 2. 기도 데이터 조회 API (통합 대시보드용)
+app.get('/api/prayers', (req, res) => {
+    res.json({ success: true, data: PRAYERS });
 });
 
 /* ─────────────────────────────────────────
@@ -102,11 +122,11 @@ app.get('/api/relay/status', (req, res) => {
     res.json({ ...relayStatus, timeLeft });
 });
 
-// 로그인 시 유저의 role 정보를 포함하여 응답 (프론트엔드 권한 제어의 핵심)
+// 로그인 시 유저의 role 정보를 포함하여 응답 (하이픈 제거 로직 추가)
 app.post('/api/login', (req, res) => {
     const { name, phone } = req.body;
-    const user = MEMBERS.find(m => m.name === name && m.phone === phone);
-    // role과 status가 포함된 유저 객체가 반환됩니다.
+    const cleanPhone = phone.replace(/-/g, ""); // 하이픈 무시
+    const user = MEMBERS.find(m => m.name === name && m.phone === cleanPhone);
     user ? res.json({ success: true, user }) : res.status(401).json({ success: false, message: "명단 확인 불가" });
 });
 
@@ -125,10 +145,10 @@ app.post('/api/relay/update-verse', (req, res) => {
 
 app.post('/api/nominate', (req, res) => {
     const { nextName, nextPhone } = req.body;
-    const nextRunner = MEMBERS.find(m => m.name === nextName && m.phone === nextPhone);
+    const cleanPhone = nextPhone.replace(/-/g, "");
+    const nextRunner = MEMBERS.find(m => m.name === nextName && m.phone === cleanPhone);
     
     if (!nextRunner) return res.status(404).json({ success: false, message: "명단 확인 불가" });
-    
     if (nextRunner.activeTeams >= 2) {
         return res.status(403).json({ success: false, message: "지목 불가: 이미 2개 팀에 참여 중인 성도님입니다." });
     }
@@ -162,4 +182,4 @@ cron.schedule('* * * * *', () => {
     }
 });
 
-app.listen(PORT, () => console.log(`🚀 Server Running with Administrative Rules & Admin Support`));
+app.listen(PORT, () => console.log(`🚀 Server Running with Pastor & Member Roles`));

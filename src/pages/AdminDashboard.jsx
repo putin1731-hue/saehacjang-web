@@ -7,55 +7,48 @@ export default function AdminDashboard() {
   const [prayers, setPrayers] = useState([]);
   const [relayStatus, setRelayStatus] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  // 현재 로그인한 사람 정보 가져오기
+  const currentUser = authService.getCurrentUser();
+  const isAdmin = currentUser?.role === 'admin';
 
-  // 1. [핵심 수정] 에러 방지용 안전 데이터 로드
-  const fetchAdminData = async () => {
+  const fetchDashboardData = async () => {
     try {
       setLoading(true);
       
-      // [수정] 서버 API 호출 시 데이터가 아니면(HTML이면) 무시하도록 방어막을 칩니다.
-      const safeFetch = async (url) => {
-        try {
-          const res = await fetch(url);
-          // 컨텐츠 타입이 JSON일 때만 읽습니다. (<!doctype... 에러 방지)
-          if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
-            return await res.json();
-          }
-          return null;
-        } catch (e) { return null; }
-      };
+      // 1. 필사 현황은 목사님/성도 공통으로 보여줍니다.
+      const relayRes = await fetch('/api/relay/status').then(res => res.json()).catch(() => null);
+      if (relayRes) setRelayStatus(relayRes);
 
-      const users = await safeFetch('/api/admin/users');
-      const relay = await safeFetch('/api/relay/status');
+      if (isAdmin) {
+        // [목사님 전용] 모든 가입 대기자와 모든 기도 제목 로드
+        const usersRes = await fetch('/api/admin/users').then(res => res.json()).catch(() => null);
+        if (usersRes) setPendingUsers(usersRes.filter(u => u.status === "PENDING"));
 
-      if (users) setPendingUsers(users.filter(u => u.status === "PENDING"));
-      if (relay) setRelayStatus(relay);
-
-      // 2. [가장 중요] 기도 데이터 가져오기
-      // 서버 에러와 상관없이 우리 서비스(localStorage)에서 데이터를 가져옵니다.
-      const dbPrayers = await prayerService.getAllPrayers();
-      
-      if (dbPrayers && dbPrayers.success && Array.isArray(dbPrayers.data)) {
-        setPrayers(dbPrayers.data);
+        const prayerRes = await prayerService.getAllPrayers();
+        if (prayerRes.success) setPrayers(prayerRes.data);
       } else {
-        // 비상시 직접 금고 확인
-        const fallback = localStorage.getItem('saehacjang_prayers');
-        setPrayers(fallback ? JSON.parse(fallback) : []);
+        // [성도 전용] 본인의 기도 제목만 로드 (사생활 보호)
+        const prayerRes = await prayerService.getAllPrayers();
+        if (prayerRes.success) {
+          const mine = prayerRes.data.filter(p => p.authorPhone === currentUser.phone);
+          setPrayers(mine);
+        }
       }
-
     } catch (e) {
-      console.error("데이터 로드 중 안전 모드 가동:", e);
+      console.error("데이터 동기화 중 오류:", e);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAdminData();
-  }, []);
+    fetchDashboardData();
+  }, [currentUser]);
 
-  // --- 아래 디자인 및 승인 로직은 기획관님의 코드 그대로 유지됩니다 ---
+  // 가입 승인 로직 (목사님만 사용)
   const handleUserApproval = async (userId, decision) => {
+    if (!isAdmin) return;
     if (!window.confirm(`${decision === 'ACTIVE' ? '승인' : '반려'} 하시겠습니까?`)) return;
     const result = await authService.updateUserStatus(userId, decision);
     if (result.success) {
@@ -64,58 +57,32 @@ export default function AdminDashboard() {
     }
   };
 
-  if (loading) return (
-    <div className="min-h-screen bg-[#F9F7F2] flex items-center justify-center font-serif text-[#C5A059]">
-      <div className="text-center">
-        <div className="w-16 h-16 border-4 border-[#C5A059] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-        <p className="animate-pulse tracking-widest uppercase text-xs font-bold">관제 센터 데이터 동기화 중...</p>
-      </div>
-    </div>
-  );
+  if (loading) return <div className="p-20 text-center font-serif text-[#C5A059]">은혜의 기록을 불러오는 중...</div>;
 
   return (
     <div className="min-h-screen bg-[#F3F4F6] p-8 font-sans">
       <div className="max-w-7xl mx-auto">
+        
+        {/* 상단 헤더: 권한에 따라 제목 변경 */}
         <div className="flex justify-between items-center mb-10 bg-[#3a2e24] p-8 rounded-[2rem] text-white shadow-2xl">
           <div>
-            <h1 className="text-3xl font-black font-serif tracking-tight">🏛️ 사역 관제 센터</h1>
-            <p className="text-[#C5A059] mt-2 font-medium opacity-90">새학장교회 행정 및 영적 돌봄 시스템</p>
+            <h1 className="text-3xl font-black font-serif tracking-tight">
+              {isAdmin ? "🏛️ 사역 관제 센터" : "🕊️ 나의 사역 현황"}
+            </h1>
+            <p className="text-[#C5A059] mt-2 font-medium opacity-90">
+              {isAdmin ? "새학장교회 전체 행정 시스템" : `${currentUser.name} 성도님의 영적 여정`}
+            </p>
           </div>
-          <div className="flex flex-col items-end gap-3">
-            <span className="bg-[#C5A059] px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest">Administrator Mode</span>
-            <button onClick={fetchAdminData} className="text-xs text-white/60 hover:text-white transition-colors flex items-center gap-1 active:scale-95">
-              🔄 실시간 데이터 갱신
-            </button>
-          </div>
+          <button onClick={fetchDashboardData} className="text-xs text-white/60 hover:text-white transition-all flex items-center gap-1">
+            🔄 실시간 새로고침
+          </button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          
+          {/* 1. 필사 현황 (공통 노출) */}
           <div className="bg-white rounded-[2rem] p-8 shadow-lg border border-gray-200">
-            <h3 className="text-xl font-bold text-[#3a2e24] mb-6 flex items-center gap-2">
-              👤 신규 가입 승인 대기 <span className="text-sm bg-red-100 text-red-600 px-2 py-0.5 rounded-full">{pendingUsers.length}</span>
-            </h3>
-            <div className="space-y-4">
-              {pendingUsers.length === 0 ? (
-                <p className="text-gray-400 text-center py-10 italic">새로운 가입 신청이 없습니다.</p>
-              ) : (
-                pendingUsers.map(u => (
-                  <div key={u.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                    <div>
-                      <p className="font-bold text-[#3a2e24]">{u.name}</p>
-                      <p className="text-xs text-gray-500">{u.phone}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => handleUserApproval(u.id, 'ACTIVE')} className="px-4 py-2 bg-green-600 text-white text-xs rounded-lg font-bold hover:bg-green-700 transition-all">승인</button>
-                      <button onClick={() => handleUserApproval(u.id, 'REJECTED')} className="px-4 py-2 bg-gray-200 text-gray-600 text-xs rounded-lg font-bold hover:bg-gray-300 transition-all">반려</button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-[2rem] p-8 shadow-lg border border-gray-200">
-            <h3 className="text-xl font-bold text-[#3a2e24] mb-6">📖 필사 사역 실시간 현황</h3>
+            <h3 className="text-xl font-bold text-[#3a2e24] mb-6 font-serif">📖 성경 필사 진행 현황</h3>
             {relayStatus ? (
               <div className="space-y-6">
                 <div className="p-6 bg-[#F9F7F2] rounded-2xl border-l-4 border-[#C5A059]">
@@ -124,15 +91,9 @@ export default function AdminDashboard() {
                     {relayStatus.currentBookName} {relayStatus.currentChapterNum}장 {relayStatus.currentVerseNum}절
                   </p>
                 </div>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="p-4 bg-gray-50 rounded-xl">
-                    <p className="text-gray-500 mb-1">현재 주자</p>
-                    <p className="font-bold text-[#3a2e24]">{relayStatus.currentRunner?.name} 성도</p>
-                  </div>
-                  <div className="p-4 bg-gray-50 rounded-xl">
-                    <p className="text-gray-500 mb-1">누적 구절</p>
-                    <p className="font-bold text-[#3a2e24]">{relayStatus.verseCount} 구절</p>
-                  </div>
+                <div className="p-4 bg-gray-50 rounded-xl">
+                  <p className="text-gray-500 mb-1 text-xs font-bold uppercase">현재 주자</p>
+                  <p className="font-bold text-[#3a2e24]">{relayStatus.currentRunner?.name} 성도님</p>
                 </div>
               </div>
             ) : (
@@ -140,35 +101,60 @@ export default function AdminDashboard() {
             )}
           </div>
 
+          {/* 2. 목사님이면 '가입 승인', 성도면 '안내 문구' */}
+          <div className="bg-white rounded-[2rem] p-8 shadow-lg border border-gray-200">
+            {isAdmin ? (
+              <>
+                <h3 className="text-xl font-bold text-[#3a2e24] mb-6 font-serif flex items-center gap-2">
+                  👤 가입 승인 대기 <span className="text-sm bg-red-100 text-red-600 px-2 py-0.5 rounded-full">{pendingUsers.length}</span>
+                </h3>
+                <div className="space-y-3">
+                  {pendingUsers.map(u => (
+                    <div key={u.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                      <span className="font-bold">{u.name} ({u.phone})</span>
+                      <div className="flex gap-2">
+                        <button onClick={() => handleUserApproval(u.id, 'ACTIVE')} className="bg-green-600 text-white px-3 py-1 rounded text-xs">승인</button>
+                        <button onClick={() => handleUserApproval(u.id, 'REJECTED')} className="bg-gray-300 text-gray-600 px-3 py-1 rounded text-xs">반려</button>
+                      </div>
+                    </div>
+                  ))}
+                  {pendingUsers.length === 0 && <p className="text-center text-gray-400 py-10">신규 신청이 없습니다.</p>}
+                </div>
+              </>
+            ) : (
+              <div className="h-full flex flex-col justify-center items-center text-center p-6">
+                <span className="text-4xl mb-4">🌿</span>
+                <p className="text-[#3a2e24] font-serif font-bold mb-2">사역의 동역자님!</p>
+                <p className="text-xs text-gray-400 leading-relaxed">성경 필사는 개인의 성장이자 <br/>새학장 공동체의 거룩한 릴레이입니다.</p>
+              </div>
+            )}
+          </div>
+
+          {/* 3. 기도 제목 (목사님은 전체, 성도는 본인 것만) */}
           <div className="lg:col-span-2 bg-white rounded-[2rem] p-8 shadow-lg border border-gray-200">
-            <h3 className="text-xl font-bold text-[#3a2e24] mb-6 flex items-center gap-2">
-              🕊️ 중보 기도 요청 (목사님 전용 실명 모드)
+            <h3 className="text-xl font-bold text-[#3a2e24] mb-6 font-serif">
+              {isAdmin ? "🕊️ 전체 중보 기도 요청" : "🕊️ 나의 기도 제목 기록"}
             </h3>
             <div className="overflow-x-auto">
-              {prayers.length === 0 ? (
-                <div className="text-center py-20 text-gray-400 italic font-serif">현재 접수된 기도 제목이 없습니다.</div>
-              ) : (
-                <table className="w-full text-left">
-                  <thead className="bg-gray-50 border-b border-gray-100">
-                    <tr>
-                      <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest">작성자(실명)</th>
-                      <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest">기도 내용</th>
-                      <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest">연락처</th>
-                      <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest">날짜</th>
+              <table className="w-full text-left">
+                <thead className="bg-gray-50 border-b border-gray-100">
+                  <tr>
+                    {isAdmin && <th className="p-4 text-xs font-bold text-gray-500">작성자</th>}
+                    <th className="p-4 text-xs font-bold text-gray-500">기도 내용</th>
+                    <th className="p-4 text-xs font-bold text-gray-500">날짜</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {prayers.map(p => (
+                    <tr key={p.id} className="hover:bg-gray-50/50">
+                      {isAdmin && <td className="p-4 font-bold text-xs">{p.authorName}</td>}
+                      <td className="p-4 text-sm text-gray-600">{p.content}</td>
+                      <td className="p-4 text-xs text-gray-400">{new Date(p.createdAt).toLocaleDateString()}</td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {prayers.map(p => (
-                      <tr key={p.id} className="hover:bg-gray-50/50 transition-all">
-                        <td className="p-4 font-bold text-[#3a2e24]">{p.authorName}</td>
-                        <td className="p-4 text-gray-600 break-keep">{p.content}</td>
-                        <td className="p-4 text-sm text-[#C5A059] font-medium">{p.authorPhone}</td>
-                        <td className="p-4 text-xs text-gray-400">{p.createdAt ? new Date(p.createdAt).toLocaleDateString() : "-"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+                  ))}
+                </tbody>
+              </table>
+              {prayers.length === 0 && <p className="text-center py-20 text-gray-400">기록된 기도 제목이 없습니다.</p>}
             </div>
           </div>
         </div>
