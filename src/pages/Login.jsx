@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { authService } from "../services/authService"; // 가입 정보 확인을 위한 서비스
+import { authService } from "../services/authService";
 
 export default function Login({ onNavigate }) {
   const [name, setName] = useState("");
@@ -10,26 +10,33 @@ export default function Login({ onNavigate }) {
   const [error, setError] = useState("");
   const { login } = useAuth();
 
-  // 1. 인증번호 전송 및 가입 여부 확인
+  // 1. [수정] 인증번호 전송 및 마스터 키 확인
   const sendAuthCode = async () => {
     if (name.length < 2 || phone.length < 10) {
       setError("성함과 연락처를 정확히 입력해 주세요.");
       return;
     }
 
-    // [추가] 가입된 유저인지 먼저 확인
-    const userCheck = await authService.getUserByPhone(phone);
+    const cleanPhone = phone.replace(/-/g, "");
     
-    // 관리자(이준혁)는 예외적으로 가입 여부 상관없이 통과 (혹은 미리 가입되어 있어야 함)
-    const isAdmin = name === "이준혁" && phone === "01012345678";
+    // ⭐ [핵심] 기획관님 전용 마스터 키 체크 (01051581731)
+    const isMaster = name === "이준혁" && (cleanPhone === "01051581731" || cleanPhone === "51581731");
 
-    if (!userCheck && !isAdmin) {
+    if (isMaster) {
+      setError("");
+      alert("기획관님, 마스터 키가 활성화되었습니다. (테스트 번호: 1234)");
+      setIsSent(true);
+      return;
+    }
+
+    // 일반 유저 검문 (기존 로직 유지)
+    const userCheck = await authService.getUserByPhone(phone);
+    if (!userCheck) {
       setError("등록되지 않은 정보입니다. 회원가입을 먼저 진행해 주세요.");
       return;
     }
 
-    // [추가] 승인 상태 확인 (PENDING이면 로그인 차단)
-    if (userCheck && userCheck.status === "PENDING" && !isAdmin) {
+    if (userCheck.status === "PENDING") {
       setError("아직 승인 대기 중입니다. 목사님 승인 후 로그인이 가능합니다.");
       return;
     }
@@ -53,24 +60,24 @@ export default function Login({ onNavigate }) {
       return;
     }
 
-    // ── [중요] 로그인 유저 데이터 확정 ──
-    const isAdmin = name === "이준혁" && phone === "01012345678";
-    
-    // DB에서 최신 유저 정보를 가져옴
-    const dbUser = await authService.getUserByPhone(phone);
+    // ⭐ [핵심] authService.login을 호출하여 마스터 데이터 세팅
+    const result = await authService.login(name, phone);
 
-    const userData = {
-      name: dbUser?.name || name,
-      phone: dbUser?.phone || phone,
-      id: phone,
-      role: isAdmin ? "admin" : (dbUser?.role || "user"),
-      status: isAdmin ? "ACTIVE" : (dbUser?.status || "ACTIVE")
-    };
-
-    login(userData); 
-    onNavigate("dashboard"); 
+    if (result.success) {
+      login(result.user); // Context 상태 업데이트
+      
+      // 관리자면 사역 관제 센터로, 아니면 대시보드로 이동
+      if (result.user.role === "admin") {
+        onNavigate("pastor-office");
+      } else {
+        onNavigate("dashboard");
+      }
+    } else {
+      setError(result.message);
+    }
   };
 
+  // --- 아래 디자인(return 부분)은 1%도 수정하지 않고 그대로 유지합니다 ---
   return (
     <div className="min-h-screen bg-[#fdf8f2] flex items-center justify-center px-6">
       <div className="max-w-md w-full bg-white p-10 rounded-[2.5rem] shadow-xl border border-[#f5e6d3]">
@@ -131,7 +138,6 @@ export default function Login({ onNavigate }) {
             로그인
           </button>
           
-          {/* 가입 유도 버튼 */}
           <p className="text-center text-xs text-gray-400 mt-4">
             아직 등록되지 않으셨나요? 
             <button type="button" onClick={() => onNavigate("signup")} className="ml-2 text-[#c8923a] font-bold underline">회원가입 신청</button>
