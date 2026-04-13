@@ -1,6 +1,6 @@
-import React, { useState, useEffect, Suspense } from "react";
+import { useState, useEffect } from "react";
 
-// 페이지 컴포넌트 임포트 (기존과 동일)
+// 디자인팀 최신 컴포넌트 및 페이지 누락 없이 임포트
 import Navbar from "./components/Navbar";
 import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
@@ -12,119 +12,109 @@ import BibleWrite from "./pages/BibleWrite";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Pending from "./pages/Pending";
-import AdminDashboard from "./pages/AdminDashboard";
 
-// 인증 및 세션 컨텍스트
+// ⭐ AuthContext 사용 (세션 관리의 핵심)
 import { AuthProvider, useAuth } from "./context/AuthContext";
 
+/* ─────────────────────────────────────────
+   디자인 정체성 유지 + 세션 고정 로직 통합
+───────────────────────────────────────── */
+
 function AppInner() {
-  const { user, logout, loading: authLoading } = useAuth();
+  const { user, logout } = useAuth();
   
-  // [개정] 첫 접속 시 무조건 home으로 고정
-  const [currentPage, setCurrentPage] = useState("home");
+  // [기술부 핵심 수정] 초기값 자체를 localStorage에서 즉시 복구 (새로고침 방어)
+  const [currentPage, setCurrentPage] = useState(() => {
+    const savedPage = localStorage.getItem("current_page");
+    return savedPage || "home"; 
+  });
 
-  // [수정] 오직 'pastor-office' 페이지에 있을 때만 Navbar에 관리자 메뉴(빨간 버튼)가 보이게 설정
   const isLoggedIn = !!user;
-  const isPastorOffice = currentPage === "pastor-office";
-  const showAdminMenu = user?.role === "admin" && isPastorOffice;
+  const isAdmin = user?.role === "admin";
 
+  // 페이지 이동 시 즉시 브라우저에 각인 (디자인부 UX 흐름 보존)
   const navigate = (page) => {
-    console.log(`🚀 [시스템 이동] ${page}`);
+    console.log("📍 페이지 이동 및 세션 기록:", page);
+    localStorage.setItem("current_page", page); 
     setCurrentPage(page);
-    window.scrollTo(0, 0);
+    window.scrollTo(0, 0); // 페이지 전환 시 상단 이동 (UX 가이드 준수)
   };
 
-  /* ─────────────────────────────────────────────────────────────
-     [보안 관제 엔진] 기획관님 지침 반영
-  ───────────────────────────────────────────────────────────── */
-  useEffect(() => {
-    // 1. 첫 접속 시 자동 로그아웃 (사람들이 처음 들어왔을 때 로그아웃 상태를 보장)
-    // 이 로직은 배포 초기 테스트 시 사용자들이 깨끗한 상태로 시작하게 돕습니다.
-    // 만약 계속 자동 로그아웃되는 게 불편하시면 이 useEffect를 주석 처리하세요.
-    const isFirstVisit = !sessionStorage.getItem("visited");
-    if (isFirstVisit) {
-      logout();
-      sessionStorage.setItem("visited", "true");
-    }
-  }, [logout]);
-
-  useEffect(() => {
-    const protectedPages = ["bible", "dashboard", "prayer"];
-    const adminOnlyPages = ["pastor-office"];
-
-    // 2. 비로그인 사용자 차단
-    if (protectedPages.includes(currentPage) && !authLoading && !isLoggedIn) {
-      navigate("login");
-    }
-
-    // 3. 관리자 전용 구역 보안 체크
-    if (adminOnlyPages.includes(currentPage) && !authLoading) {
-      if (user?.role !== "admin") {
-        console.error("⛔ [접근 거부] 일반 성도는 진입할 수 없습니다.");
-        navigate("home"); // 관리자 아니면 홈으로 쫓아냄
-      }
-    }
-  }, [currentPage, isLoggedIn, user, authLoading]);
-
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-[#F9F7F2] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-[#C5A059] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="animate-pulse tracking-widest text-xs font-bold text-[#C5A059]">서버 연결 중...</p>
-        </div>
-      </div>
-    );
-  }
-
+  // [디자인부 최신 시안 기반 렌더링 엔진]
   const renderPage = () => {
+    // 1. 비로그인 상태에서 보호가 필요한 페이지 처리 (튕김 방지 및 보안)
+    const protectedPages = ["prayer", "dashboard", "bible"];
+    if (protectedPages.includes(currentPage) && !isLoggedIn) {
+      return <Login onNavigate={navigate} />;
+    }
+
+    // 2. 스위칭 로직 (디자인팀 최종 페이지 리스트 100% 반영)
     switch (currentPage) {
-      case "pastor": return <PastorGreeting onNavigate={navigate} />;
-      case "vision": return <Vision onNavigate={navigate} />;
-      case "history": return <ChurchHistory onNavigate={navigate} />;
-      case "bible": return <BibleWrite onFinish={() => navigate("home")} />;
-      case "dashboard": return <Dashboard onNavigate={navigate} />;
-      case "prayer": return <PrayerBoard currentUser={user} onNavigate={navigate} />;
-      case "login": return <Login onNavigate={navigate} />;
-      case "signup": return <Signup onNavigate={navigate} />;
-      case "pending": return <Pending />;
-      case "pastor-office": 
-        return user?.role === "admin" ? <AdminDashboard onNavigate={navigate} /> : <Home onNavigate={navigate} />;
+      case "history":
+        return <ChurchHistory onNavigate={navigate} />;
+
+      case "pastor":
+        return <PastorGreeting onNavigate={navigate} />;
+
+      case "vision":
+        return <Vision onNavigate={navigate} />;
+
+      case "login":
+        return <Login onNavigate={navigate} />;
+
+      case "signup":
+        return <Signup onNavigate={navigate} />;
+
+      case "pending":
+        return <Pending onNavigate={navigate} />;
+
+      case "prayer":
+        return <PrayerBoard currentUser={user} onNavigate={navigate} />;
+
+      case "dashboard":
+        return <Dashboard user={user} onNavigate={navigate} />;
+
+      case "bible":
+        // 디자인부의 최신 정밀 필사 엔진 (onFinish 시 홈으로 안전하게 복귀)
+        return <BibleWrite onFinish={() => navigate("home")} />;
+
       case "home":
-      default: return <Home onNavigate={navigate} />;
+      default:
+        return <Home onNavigate={navigate} />;
+    }
+  };
+
+  // [수정] 인위적인 로그아웃 버튼 클릭 시에만 세션 파기
+  const handleManualLogout = async () => {
+    if (window.confirm("정말로 로그아웃하시겠습니까?")) {
+      localStorage.removeItem("current_page"); // 보던 페이지 기록 삭제
+      await logout(); // AuthContext의 logout 호출 (세션 제거)
+      navigate("home");
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#F9F7F2] font-sans">
+    // 디자인부 가이드: 배경색 #fdf8f2 및 폰트 설정 엄수
+    <div className="min-h-screen bg-[#fdf8f2] font-sans">
       <Navbar
         onNavigate={navigate}
         isLoggedIn={isLoggedIn}
-        isAdmin={showAdminMenu} // [핵심] pastor-office 주소일 때만 true가 넘어감
+        isAdmin={isAdmin}
         currentPage={currentPage}
-        onLogout={() => {
-          if (window.confirm("로그아웃하시겠습니까?")) {
-            logout();
-            navigate("home");
-          }
-        }}
+        onLogout={handleManualLogout} 
       />
 
-      <main className="pt-[75px] animate-in fade-in duration-700">
-        <Suspense fallback={<div className="bg-[#F9F7F2] h-screen" />}>
-          {renderPage()}
-        </Suspense>
-      </main>
-
-      <footer className="py-12 bg-white border-t border-[#E9DCC9] mt-20 text-center">
-        <p className="text-[11px] text-[#8b5e3c] font-serif tracking-widest opacity-60 uppercase">
-          Digital Sanctuary &copy; 2026. All Rights Reserved.
-        </p>
-      </footer>
+      {/* 디자인부 네비바 높이(70px)를 고려한 상단 여백 유지 */}
+      <div className="pt-[70px]">
+        {renderPage()}
+      </div>
     </div>
   );
 }
 
+/* ─────────────────────────────────────────
+   AuthProvider로 감싸기 (시스템의 심장)
+───────────────────────────────────────── */
 export default function App() {
   return (
     <AuthProvider>

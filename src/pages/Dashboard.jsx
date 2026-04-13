@@ -1,161 +1,177 @@
 import React, { useState, useEffect } from "react";
-import { useAuth } from "../context/AuthContext";
+import { authService } from "../services/authService";
+import { prayerService } from "../services/prayerService";
 
-export default function Dashboard({ onNavigate }) {
-  const { user } = useAuth(); // 관리자 체크를 위해 user 객체 사용
-  const [relayData, setRelayData] = useState(null);
+export default function AdminDashboard() {
+  const [pendingUsers, setPendingUsers] = useState([]);
+  const [prayers, setPrayers] = useState([]);
+  const [relayStatus, setRelayStatus] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchStatus = async () => {
-      try {
-        const response = await fetch('/api/relay/status');
-        if (!response.ok) throw new Error('네트워크 응답 에러');
-        
-        const data = await response.json(); 
-        setRelayData(data);
-      } catch (e) {
-        console.error("지휘부 서버 연결 실패:", e);
-      } finally {
-        setLoading(false);
-      }
-    };
+  // 1. [핵심 수정] 에러 방지용 안전 데이터 로드
+  const fetchAdminData = async () => {
+    try {
+      setLoading(true);
+      
+      // [수정] 서버 API 호출 시 데이터가 아니면(HTML이면) 무시하도록 방어막을 칩니다.
+      const safeFetch = async (url) => {
+        try {
+          const res = await fetch(url);
+          // 컨텐츠 타입이 JSON일 때만 읽습니다. (<!doctype... 에러 방지)
+          if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
+            return await res.json();
+          }
+          return null;
+        } catch (e) { return null; }
+      };
 
-    fetchStatus();
-    const interval = setInterval(fetchStatus, 30000);
-    return () => clearInterval(interval);
+      const users = await safeFetch('/api/admin/users');
+      const relay = await safeFetch('/api/relay/status');
+
+      if (users) setPendingUsers(users.filter(u => u.status === "PENDING"));
+      if (relay) setRelayStatus(relay);
+
+      // 2. [가장 중요] 기도 데이터 가져오기
+      // 서버 에러와 상관없이 우리 서비스(localStorage)에서 데이터를 가져옵니다.
+      const dbPrayers = await prayerService.getAllPrayers();
+      
+      if (dbPrayers && dbPrayers.success && Array.isArray(dbPrayers.data)) {
+        setPrayers(dbPrayers.data);
+      } else {
+        // 비상시 직접 금고 확인
+        const fallback = localStorage.getItem('saehacjang_prayers');
+        setPrayers(fallback ? JSON.parse(fallback) : []);
+      }
+
+    } catch (e) {
+      console.error("데이터 로드 중 안전 모드 가동:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAdminData();
   }, []);
 
-  if (loading || !relayData) {
-    return (
-      <div className="min-h-screen bg-[#F9F7F2] flex items-center justify-center font-serif text-[#C5A059] animate-pulse">
-        성소의 기록을 불러오는 중입니다...
-      </div>
-    );
-  }
+  // --- 아래 디자인 및 승인 로직은 기획관님의 코드 그대로 유지됩니다 ---
+  const handleUserApproval = async (userId, decision) => {
+    if (!window.confirm(`${decision === 'ACTIVE' ? '승인' : '반려'} 하시겠습니까?`)) return;
+    const result = await authService.updateUserStatus(userId, decision);
+    if (result.success) {
+      alert("처리가 완료되었습니다.");
+      setPendingUsers(prev => prev.filter(u => u.id !== userId));
+    }
+  };
 
-  const diff = relayData.timeLeft || 0;
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  if (loading) return (
+    <div className="min-h-screen bg-[#F9F7F2] flex items-center justify-center font-serif text-[#C5A059]">
+      <div className="text-center">
+        <div className="w-16 h-16 border-4 border-[#C5A059] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+        <p className="animate-pulse tracking-widest uppercase text-xs font-bold">관제 센터 데이터 동기화 중...</p>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-[#F9F7F2] py-12 px-6 font-sans">
-      <div className="max-w-5xl mx-auto">
-        
-        {/* 상단 헤더 영역: 제목과 관리자 버튼 통합 */}
-        <div className="mb-12 flex flex-col md:flex-row md:justify-between md:items-end gap-6">
-          <div className="text-center md:text-left">
-            <h1 className="text-4xl font-black text-[#3a2e24] font-serif tracking-tighter">릴레이 사역 현황</h1>
-            <p className="text-[#8b5e3c] mt-3 italic font-serif opacity-80">"한 사람의 진심이 온 공동체의 고백이 됩니다"</p>
+    <div className="min-h-screen bg-[#F3F4F6] p-8 font-sans">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-10 bg-[#3a2e24] p-8 rounded-[2rem] text-white shadow-2xl">
+          <div>
+            <h1 className="text-3xl font-black font-serif tracking-tight">🏛️ 사역 관제 센터</h1>
+            <p className="text-[#C5A059] mt-2 font-medium opacity-90">새학장교회 행정 및 영적 돌봄 시스템</p>
           </div>
-
-          {/* ⭐ 관리자일 때만 비밀 버튼이 나타남 (디자인 최적화) */}
-          {user && user.role === 'admin' && (
-            <button 
-              onClick={() => onNavigate('pastor-office')} 
-              className="bg-[#3a2e24] text-[#C5A059] px-6 py-3 rounded-full text-xs font-bold border border-[#C5A059] hover:bg-[#C5A059] hover:text-white transition-all shadow-lg flex items-center justify-center gap-2 mx-auto md:mx-0"
-            >
-              🏛️ 관리자 관제 센터 입장
-            </button>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          <div className="lg:col-span-2 bg-white rounded-[2.5rem] shadow-xl border border-[#E9DCC9] p-10 relative overflow-hidden">
-            <div className="absolute top-8 right-8">
-              <span className={`px-4 py-1.5 rounded-full text-[10px] font-bold tracking-widest uppercase border 
-                ${relayData.status === 'ACTIVE' ? 'bg-green-50 text-green-600 border-green-200' : 'bg-[#FAF3F2] text-[#D29181] border-[#D29181] animate-pulse'}`}>
-                {relayData.status === 'ACTIVE' ? '필사 진행 중' : '수락 대기 중'}
-              </span>
-            </div>
-
-            <div className="flex flex-col md:flex-row items-center gap-10">
-              <div className="w-28 h-28 bg-[#F9F7F2] rounded-full flex items-center justify-center border-2 border-[#C5A059] shadow-inner text-4xl">
-                🖋️
-              </div>
-              <div className="text-center md:text-left">
-                <p className="text-[#C5A059] text-[11px] font-black uppercase tracking-[0.2em] mb-2">Current Relay Runner</p>
-                <h2 className="text-4xl font-black text-[#3a2e24] font-serif tracking-tight">
-                  {relayData.currentRunner?.name || "주자 정보 없음"} 성도님
-                </h2>
-                <p className="text-[#8b5e3c] mt-2 font-medium opacity-70 italic">{relayData.currentRunner?.phone}</p>
-              </div>
-            </div>
-
-            <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-6 pt-10 border-t border-[#F9F7F2]">
-              <div className="bg-[#F9F7F2]/50 p-6 rounded-3xl border border-[#E9DCC9]/30">
-                <p className="text-[10px] font-bold text-[#8b5e3c] uppercase mb-1">남은 은혜의 시간</p>
-                <p className="text-3xl font-serif text-[#3a2e24] font-bold">
-                  {hours}시간 {minutes}분
-                </p>
-              </div>
-              
-              <div className="bg-[#F9F7F2]/50 p-6 rounded-3xl border border-[#E9DCC9]/30">
-                <p className="text-[10px] font-bold text-[#8b5e3c] uppercase mb-1">현재 필사 진행 상황</p>
-                <p className="text-xl font-serif text-[#3a2e24] font-bold">
-                  {relayData.currentBookName} {relayData.currentChapterNum}장 {relayData.currentVerseNum}절 진행 중
-                </p>
-                <p className="text-[10px] text-[#C5A059] mt-2 font-medium italic opacity-80">
-                  * 우리 공동체가 {relayData.verseCount}구절을 함께 이어왔습니다.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* 공지사항 섹션 */}
-          <div className="bg-[#3a2e24] rounded-[2.5rem] shadow-2xl p-10 text-white flex flex-col justify-between relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-[#C5A059]/10 rounded-full -mr-16 -mt-16"></div>
-            <div>
-              <h3 className="text-xl font-serif font-bold text-[#C5A059] mb-8 flex items-center gap-2">
-                🏛️ 행정부 공지
-              </h3>
-              <div className="space-y-6 text-sm font-serif opacity-90 leading-relaxed">
-                <p className="pb-4 border-b border-white/10">
-                  <span className="text-[#C5A059] font-bold block mb-1">01. 중복 참여 제한</span>
-                  조열심 성도님은 현재 2개 팀 참여로 인해 추가 지목이 제한됩니다.
-                </p>
-                <p className="pb-4 border-b border-white/10">
-                  <span className="text-[#C5A059] font-bold block mb-1">02. 24시간 수락 원칙</span>
-                  지목 후 24시간 내 미수락 시 바통은 자동 회수(VOID) 처리됩니다.
-                </p>
-              </div>
-            </div>
-            
-            <button 
-              onClick={() => onNavigate('home')}
-              className="mt-10 w-full py-4 rounded-full border border-[#C5A059] text-[#C5A059] text-[11px] font-black uppercase tracking-widest hover:bg-[#C5A059] hover:text-white transition-all duration-300"
-            >
-              Back to Sanctuary
+          <div className="flex flex-col items-end gap-3">
+            <span className="bg-[#C5A059] px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest">Administrator Mode</span>
+            <button onClick={fetchAdminData} className="text-xs text-white/60 hover:text-white transition-colors flex items-center gap-1 active:scale-95">
+              🔄 실시간 데이터 갱신
             </button>
           </div>
         </div>
 
-        {/* 히스토리 섹션 */}
-        <div className="mt-10 bg-white rounded-[2.5rem] shadow-xl border border-[#E9DCC9] p-10">
-          <div className="flex items-center justify-between mb-8">
-            <h3 className="text-lg font-bold text-[#3a2e24] font-serif">🕊️ 사역 히스토리</h3>
-            <span className="text-[10px] text-[#8b5e3c] font-black uppercase tracking-widest bg-[#F9F7F2] px-3 py-1 rounded-full">Record of Grace</span>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="bg-white rounded-[2rem] p-8 shadow-lg border border-gray-200">
+            <h3 className="text-xl font-bold text-[#3a2e24] mb-6 flex items-center gap-2">
+              👤 신규 가입 승인 대기 <span className="text-sm bg-red-100 text-red-600 px-2 py-0.5 rounded-full">{pendingUsers.length}</span>
+            </h3>
+            <div className="space-y-4">
+              {pendingUsers.length === 0 ? (
+                <p className="text-gray-400 text-center py-10 italic">새로운 가입 신청이 없습니다.</p>
+              ) : (
+                pendingUsers.map(u => (
+                  <div key={u.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                    <div>
+                      <p className="font-bold text-[#3a2e24]">{u.name}</p>
+                      <p className="text-xs text-gray-500">{u.phone}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => handleUserApproval(u.id, 'ACTIVE')} className="px-4 py-2 bg-green-600 text-white text-xs rounded-lg font-bold hover:bg-green-700 transition-all">승인</button>
+                      <button onClick={() => handleUserApproval(u.id, 'REJECTED')} className="px-4 py-2 bg-gray-200 text-gray-600 text-xs rounded-lg font-bold hover:bg-gray-300 transition-all">반려</button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
-          
-          <div className="flex items-center gap-6 overflow-x-auto pb-4 scrollbar-hide">
-            <div className="flex-shrink-0 flex flex-col items-center">
-              <div className="w-12 h-12 rounded-full border border-[#E9DCC9] bg-[#F9F7F2] flex items-center justify-center text-xs opacity-50">⛪</div>
-              <span className="text-[10px] mt-2 font-bold text-[#8b5e3c]">START</span>
-            </div>
-            <div className="w-12 h-[1px] bg-[#E9DCC9]"></div>
-            <div className="flex-shrink-0 flex flex-col items-center">
-              <div className="w-14 h-14 rounded-full bg-[#C5A059] flex items-center justify-center text-white text-xs font-bold shadow-lg">준혁</div>
-              <span className="text-[10px] mt-2 font-black text-[#3a2e24]">완료</span>
-            </div>
-            <div className="w-12 h-[1px] border-t-2 border-dashed border-[#C5A059]"></div>
-            <div className="flex-shrink-0 flex flex-col items-center">
-              <div className="w-14 h-14 rounded-full border-2 border-dashed border-[#C5A059] flex items-center justify-center text-[#C5A059] text-xs font-bold animate-pulse">NEXT</div>
-              <span className="text-[10px] mt-2 font-bold text-[#C5A059]">대기 중</span>
+
+          <div className="bg-white rounded-[2rem] p-8 shadow-lg border border-gray-200">
+            <h3 className="text-xl font-bold text-[#3a2e24] mb-6">📖 필사 사역 실시간 현황</h3>
+            {relayStatus ? (
+              <div className="space-y-6">
+                <div className="p-6 bg-[#F9F7F2] rounded-2xl border-l-4 border-[#C5A059]">
+                  <p className="text-[10px] font-bold text-[#8b5e3c] uppercase mb-1">현재 필사 위치</p>
+                  <p className="text-2xl font-serif font-bold text-[#3a2e24]">
+                    {relayStatus.currentBookName} {relayStatus.currentChapterNum}장 {relayStatus.currentVerseNum}절
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="p-4 bg-gray-50 rounded-xl">
+                    <p className="text-gray-500 mb-1">현재 주자</p>
+                    <p className="font-bold text-[#3a2e24]">{relayStatus.currentRunner?.name} 성도</p>
+                  </div>
+                  <div className="p-4 bg-gray-50 rounded-xl">
+                    <p className="text-gray-500 mb-1">누적 구절</p>
+                    <p className="font-bold text-[#3a2e24]">{relayStatus.verseCount} 구절</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-gray-400 text-center py-10 italic">필사 데이터를 불러올 수 없습니다.</p>
+            )}
+          </div>
+
+          <div className="lg:col-span-2 bg-white rounded-[2rem] p-8 shadow-lg border border-gray-200">
+            <h3 className="text-xl font-bold text-[#3a2e24] mb-6 flex items-center gap-2">
+              🕊️ 중보 기도 요청 (목사님 전용 실명 모드)
+            </h3>
+            <div className="overflow-x-auto">
+              {prayers.length === 0 ? (
+                <div className="text-center py-20 text-gray-400 italic font-serif">현재 접수된 기도 제목이 없습니다.</div>
+              ) : (
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50 border-b border-gray-100">
+                    <tr>
+                      <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest">작성자(실명)</th>
+                      <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest">기도 내용</th>
+                      <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest">연락처</th>
+                      <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest">날짜</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {prayers.map(p => (
+                      <tr key={p.id} className="hover:bg-gray-50/50 transition-all">
+                        <td className="p-4 font-bold text-[#3a2e24]">{p.authorName}</td>
+                        <td className="p-4 text-gray-600 break-keep">{p.content}</td>
+                        <td className="p-4 text-sm text-[#C5A059] font-medium">{p.authorPhone}</td>
+                        <td className="p-4 text-xs text-gray-400">{p.createdAt ? new Date(p.createdAt).toLocaleDateString() : "-"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );

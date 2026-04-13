@@ -1,11 +1,12 @@
 /**
  * [authService.js]
- * 회원가입, 로그인(마스터 키 포함), 목사님 승인 프로세스 관리
+ * 황의종 목사님(관리자)과 이준혁 성도님(일반) 권한 분리 및 세션 관리
  */
 
-const USER_STORAGE_KEY = 'saehacjang_users';
+const USER_STORAGE_KEY = 'saehacjang_users'; 
+const SESSION_KEY = 'church_user';
 
-// 예시 회원 5명 + 기획관님(관리자) 기본 데이터
+// 1. 초기 시스템 데이터 (기준점)
 const DEFAULT_USERS = [
   { id: "admin_01", name: "황의종", phone: "010-2553-0691", role: "admin", status: "ACTIVE" },
   { id: "user_01", name: "이준혁", phone: "010-5158-1731", role: "user", status: "ACTIVE" },
@@ -16,34 +17,37 @@ const DEFAULT_USERS = [
 ];
 
 export const authService = {
-  // 초기 데이터 세팅 (금고가 비어있으면 예시 회원들로 채움)
+  // 초기 데이터 세팅 (DB가 비어있을 때만 실행)
   initData: () => {
     if (!localStorage.getItem(USER_STORAGE_KEY)) {
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(DEFAULT_USERS));
     }
   },
 
-  // 1. 로그인 (기획관님 하이패스 포함)
+  // 1. [핵심] 로그인 처리 (권한별 맞춤 입장)
   login: async (name, phone) => {
-    authService.initData(); // 데이터 없으면 초기화
-    const cleanPhone = phone.replace(/-/g, ""); // 하이픈 제거
+    authService.initData();
+    const cleanPhone = phone.replace(/-/g, "");
     
-    // [슈퍼 패스] 기획관님은 무조건 통과
-    if (name === "이준혁" && (cleanPhone === "51581731" || cleanPhone === "01051581731")) {
-      const admin = DEFAULT_USERS[0];
-      localStorage.setItem('church_user', JSON.stringify(admin));
-      return { success: true, user: admin };
+    // A. [관리자 검문] 황의종 목사님인 경우
+    if (name === "황의종" && (cleanPhone === "01025530691" || cleanPhone === "25530691")) {
+      const adminUser = DEFAULT_USERS.find(u => u.id === "admin_01");
+      localStorage.setItem(SESSION_KEY, JSON.stringify(adminUser));
+      return { success: true, user: adminUser };
     }
 
-    // 일반 유저 확인
+    // B. [성도 검문] 이준혁 기획관님 포함 일반 성도인 경우
     const data = localStorage.getItem(USER_STORAGE_KEY);
     const users = data ? JSON.parse(data) : [];
-    const foundUser = users.find(u => u.name === name && u.phone.replace(/-/g, "") === cleanPhone);
+    const foundUser = users.find(u => 
+      u.name === name && u.phone.replace(/-/g, "") === cleanPhone
+    );
 
     if (foundUser) {
       const access = authService.canAccess(foundUser);
       if (access.allowed) {
-        localStorage.setItem('church_user', JSON.stringify(foundUser));
+        // DB에 저장된 실제 권한(role)을 부여 (이준혁 성도는 'user' 권한으로 입장)
+        localStorage.setItem(SESSION_KEY, JSON.stringify(foundUser));
         return { success: true, user: foundUser };
       }
       return { success: false, message: access.message };
@@ -54,13 +58,13 @@ export const authService = {
 
   // 2. 로그아웃
   logout: () => {
-    localStorage.removeItem('church_user');
+    localStorage.removeItem(SESSION_KEY);
     window.location.href = '/';
   },
 
-  // 3. 현재 로그인된 유저 가져오기
+  // 3. 세션 복구 (새로고침 대응)
   getCurrentUser: () => {
-    const user = localStorage.getItem('church_user');
+    const user = localStorage.getItem(SESSION_KEY);
     return user ? JSON.parse(user) : null;
   },
 
@@ -94,7 +98,7 @@ export const authService = {
     return { allowed: user.status === "ACTIVE", message: "환영합니다!" };
   },
 
-  // 6. [목사님 전용] 승인/반려 처리
+  // 6. [행정] 승인/반려 처리
   updateUserStatus: async (userId, decision) => {
     const data = localStorage.getItem(USER_STORAGE_KEY);
     if (data) {
