@@ -13,11 +13,14 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Pending from "./pages/Pending";
 
+// ⭐ [중요 추가] 아까 만든 통합형 관리자 대시보드 임포트
+import AdminDashboard from "./pages/AdminDashboard"; 
+
 // ⭐ AuthContext 사용 (세션 관리의 핵심)
 import { AuthProvider, useAuth } from "./context/AuthContext";
 
 /* ─────────────────────────────────────────
-   디자인 정체성 유지 + 세션 고정 로직 통합
+    디자인 정체성 유지 + 세션 고정 로직 통합
 ───────────────────────────────────────── */
 
 function AppInner() {
@@ -37,19 +40,24 @@ function AppInner() {
     console.log("📍 페이지 이동 및 세션 기록:", page);
     localStorage.setItem("current_page", page); 
     setCurrentPage(page);
-    window.scrollTo(0, 0); // 페이지 전환 시 상단 이동 (UX 가이드 준수)
+    window.scrollTo(0, 0); // 페이지 전환 시 상단 이동
   };
 
   // [디자인부 최신 시안 기반 렌더링 엔진]
   const renderPage = () => {
-    // 1. 비로그인 상태에서 보호가 필요한 페이지 처리 (튕김 방지 및 보안)
-    const protectedPages = ["prayer", "dashboard", "bible"];
+    // 1. 비로그인 상태에서 보호가 필요한 페이지 처리
+    const protectedPages = ["prayer", "dashboard", "bible", "pastor-office", "AdminDashboard"];
     if (protectedPages.includes(currentPage) && !isLoggedIn) {
       return <Login onNavigate={navigate} />;
     }
 
-    // 2. 스위칭 로직 (디자인팀 최종 페이지 리스트 100% 반영)
+    // 2. 스위칭 로직 (디자인팀 최종 페이지 리스트 100% 반영 + 관리자 모드 추가)
     switch (currentPage) {
+      // ⭐ [신규 추가] 목사님 관제 센터 전용 통로
+      case "pastor-office":
+      case "AdminDashboard":
+        return <AdminDashboard onNavigate={navigate} />;
+
       case "history":
         return <ChurchHistory onNavigate={navigate} />;
 
@@ -72,39 +80,39 @@ function AppInner() {
         return <PrayerBoard currentUser={user} onNavigate={navigate} />;
 
       case "dashboard":
-        return <Dashboard user={user} onNavigate={navigate} />;
+        // 일반 성도는 Dashboard로, 관리자(목사님)는 자동으로 관제 센터 기능을 가진 AdminDashboard로 연결
+        // (아까 우리가 AdminDashboard 하나로 통합했으므로 이를 활용합니다)
+        return <AdminDashboard onNavigate={navigate} />;
 
       case "bible":
-        // 디자인부의 최신 정밀 필사 엔진 (onFinish 시 홈으로 안전하게 복귀)
         return <BibleWrite onFinish={() => navigate("home")} />;
 
       case "home":
       default:
-        return <Home onNavigate={navigate} />;
+        return <Home onNavigate={navigate} currentUser={user} />;
     }
   };
 
-  // [수정] 인위적인 로그아웃 버튼 클릭 시에만 세션 파기
   const handleManualLogout = async () => {
     if (window.confirm("정말로 로그아웃하시겠습니까?")) {
-      localStorage.removeItem("current_page"); // 보던 페이지 기록 삭제
-      await logout(); // AuthContext의 logout 호출 (세션 제거)
+      localStorage.removeItem("current_page"); 
+      await logout(); 
       navigate("home");
     }
   };
 
   return (
-    // 디자인부 가이드: 배경색 #fdf8f2 및 폰트 설정 엄수
     <div className="min-h-screen bg-[#fdf8f2] font-sans">
       <Navbar
         onNavigate={navigate}
         isLoggedIn={isLoggedIn}
-        isAdmin={isAdmin}
+        isAdmin={isAdmin} // 목사님 로그인 시 true가 전달되어 ⚙️ 버튼이 활성화됨
         currentPage={currentPage}
         onLogout={handleManualLogout} 
+        user={user} // Navbar에서 이름 표시를 위해 추가
       />
 
-      {/* 디자인부 네비바 높이(70px)를 고려한 상단 여백 유지 */}
+      {/* 디자인부 가이드: 상단 여백 유지 */}
       <div className="pt-[70px]">
         {renderPage()}
       </div>
@@ -112,9 +120,6 @@ function AppInner() {
   );
 }
 
-/* ─────────────────────────────────────────
-   AuthProvider로 감싸기 (시스템의 심장)
-───────────────────────────────────────── */
 export default function App() {
   return (
     <AuthProvider>
