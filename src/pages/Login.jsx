@@ -20,7 +20,10 @@ export default function Login({ onNavigate }) {
     const cleanPhone = phone.replace(/-/g, "");
     
     // ⭐ [핵심] 기획관님 전용 마스터 키 체크 (01051581731)
-    const isMaster = name === "이준혁" && (cleanPhone === "01051581731" || cleanPhone === "51581731");
+    
+    const isMasterKey = 
+    (name === "황의종" && (cleanPhone === "01025530691" || cleanPhone === "25530691")) ||
+    (name === "이준혁" && (cleanPhone === "01051581731" || cleanPhone === "51581731"));
 
     if (isMaster) {
       setError("");
