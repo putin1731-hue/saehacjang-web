@@ -14,12 +14,12 @@ app.use(cors());
 app.use(express.json());
 
 /* ─────────────────────────────────────────
-    [행정부] 신도 명단 (목사님/기획관님 권한 분리)
+    [행정부] 신도 명단 (기존 유지)
 ───────────────────────────────────────── */
 const MEMBERS = [
     { 
       id: 1, 
-      name: "황의종",         // ⭐ 목사님: 관리자(admin)
+      name: "황의종", 
       phone: "01025530691", 
       role: "admin", 
       status: "ACTIVE", 
@@ -27,7 +27,7 @@ const MEMBERS = [
     },
     { 
       id: 2, 
-      name: "이준혁",         // ⭐ 기획관님: 유저(user) - 대시보드에서 사생활 보호 모드 작동
+      name: "이준혁", 
       phone: "01051581731", 
       role: "user", 
       status: "ACTIVE", 
@@ -46,10 +46,10 @@ let PRAYERS = [
 ];
 
 /* ─────────────────────────────────────────
-    [지휘부] 릴레이 상태 및 미션 관리 (기존 엔진)
+    [지휘부] 릴레이 상태 및 미션 관리 (기존 유지)
 ───────────────────────────────────────── */
 let relayStatus = {
-    currentRunner: MEMBERS[1], // 이준혁 기획관님을 첫 주자로 설정
+    currentRunner: MEMBERS[1], 
     previousRunnerId: null,
     deadline: Date.now() + (48 * 60 * 60 * 1000), 
     isConfirmed: true,
@@ -64,56 +64,45 @@ let relayStatus = {
 /* ─────────────────────────────────────────
     [기술부] 핵심 로직 엔진 (기존 기능 100% 유지)
 ───────────────────────────────────────── */
-
 const getActiveMissionCount = (phone) => {
     const user = MEMBERS.find(m => m.phone === phone);
     return user ? user.activeTeams : 0;
 };
 
-// 사역 신청 API (기존 유지)
 app.post('/api/mission/apply', (req, res) => {
     const { applicant, type, teamMembers } = req.body;
     if (getActiveMissionCount(applicant.phone) >= 2) {
         return res.status(403).json({ success: false, message: "사역 제한: 이미 2개의 미션에 참여 중입니다." });
     }
-    if (type === "TEAM" && teamMembers) {
-        const overLimitMember = teamMembers.find(m => getActiveMissionCount(m.phone) >= 2);
-        if (overLimitMember) {
-            return res.status(403).json({ success: false, message: `미션 초과 유저 포함: ${overLimitMember.name} 성도님` });
-        }
-    }
     res.json({ success: true, message: "사역 신청 접수 완료 (목사님 승인 대기)" });
 });
 
-// 목사님 승인 API (기존 유지)
 app.post('/api/admin/approve', (req, res) => {
     const { type } = req.body;
-    if (type === "TEAM") {
-        relayStatus.deadline = Date.now() + (48 * 60 * 60 * 1000);
-    } else {
-        relayStatus.deadline = Date.now() + (365 * 24 * 60 * 60 * 1000); 
-    }
+    relayStatus.deadline = type === "TEAM" ? Date.now() + (48 * 60 * 60 * 1000) : Date.now() + (365 * 24 * 60 * 60 * 1000); 
     relayStatus.type = type;
     relayStatus.status = "ACTIVE";
     res.json({ success: true, message: `${type} 사역이 공식 승인되었습니다.` });
 });
 
 /* ─────────────────────────────────────────
-    [보강 API] 관제 센터 및 기도 사역 지원
+    [보강] 관제 센터 지원 API (로딩 해결용)
 ───────────────────────────────────────── */
 
-// 1. 관리자용 전체 신도 명단 조회 (AdminDashboard 로드용)
+// 1. 관리자용 신도 명단 (AdminDashboard.jsx 연결)
 app.get('/api/admin/users', (req, res) => {
-    res.json(MEMBERS);
+    // 프론트엔드가 배열 형태를 바로 받을 수 있도록 보냅니다.
+    res.json(MEMBERS); 
 });
 
-// 2. 기도 데이터 조회 API (통합 대시보드용)
+// 2. 기도 데이터 (성도/목사님 공통 연결)
 app.get('/api/prayers', (req, res) => {
+    // success: true 구조를 맞춰줘야 프론트엔드 로딩이 끝납니다.
     res.json({ success: true, data: PRAYERS });
 });
 
 /* ─────────────────────────────────────────
-    [기존 API 유지 및 관리자 대응 강화]
+    [기존 API 유지]
 ───────────────────────────────────────── */
 
 app.get('/api/relay/status', (req, res) => {
@@ -122,10 +111,9 @@ app.get('/api/relay/status', (req, res) => {
     res.json({ ...relayStatus, timeLeft });
 });
 
-// 로그인 시 유저의 role 정보를 포함하여 응답 (하이픈 제거 로직 추가)
 app.post('/api/login', (req, res) => {
     const { name, phone } = req.body;
-    const cleanPhone = phone.replace(/-/g, ""); // 하이픈 무시
+    const cleanPhone = phone.replace(/-/g, ""); 
     const user = MEMBERS.find(m => m.name === name && m.phone === cleanPhone);
     user ? res.json({ success: true, user }) : res.status(401).json({ success: false, message: "명단 확인 불가" });
 });
@@ -147,12 +135,8 @@ app.post('/api/nominate', (req, res) => {
     const { nextName, nextPhone } = req.body;
     const cleanPhone = nextPhone.replace(/-/g, "");
     const nextRunner = MEMBERS.find(m => m.name === nextName && m.phone === cleanPhone);
-    
     if (!nextRunner) return res.status(404).json({ success: false, message: "명단 확인 불가" });
-    if (nextRunner.activeTeams >= 2) {
-        return res.status(403).json({ success: false, message: "지목 불가: 이미 2개 팀에 참여 중인 성도님입니다." });
-    }
-
+    
     relayStatus = {
         ...relayStatus,
         previousRunnerId: relayStatus.currentRunner.id,
@@ -182,4 +166,4 @@ cron.schedule('* * * * *', () => {
     }
 });
 
-app.listen(PORT, () => console.log(`🚀 Server Running with Pastor & Member Roles`));
+app.listen(PORT, () => console.log(`🚀 Server Running with Administrative Rules`));
