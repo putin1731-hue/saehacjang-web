@@ -53,15 +53,15 @@ export default function Navbar({ isLoggedIn, isAdmin, currentPage, onNavigate, o
     >
       <div className="max-w-5xl mx-auto px-4 sm:px-6 flex items-center justify-between h-[68px]">
         
-        {/* 로고 섹션 */}
-        <button onClick={() => onNavigate("home")} className="flex flex-col text-left group">
+        {/* 로고 섹션 (기존 디자인 100% 복구) */}
+        <button onClick={() => onNavigate("home")} className="flex flex-col text-left group outline-none">
           <span className="font-bold text-[1.1rem] text-[#8b5e3c] group-hover:text-[#c8923a] transition-colors">
             ✝ 새학장교회
           </span>
           <span className="text-[0.78rem] text-[#c8923a]">SaeHakjang Church</span>
         </button>
 
-        {/* 데스크탑 내비게이션 */}
+        {/* 데스크탑 내비게이션 (기존 드롭다운 UI 100% 복구) */}
         <div className="hidden sm:flex items-center gap-1">
           <ul className="flex items-center list-none m-0 p-0 gap-[0.15rem]">
             {activeNavKeys.map((key) => {
@@ -72,7 +72,7 @@ export default function Navbar({ isLoggedIn, isAdmin, currentPage, onNavigate, o
                 <li key={key} className="relative group">
                   <button
                     onClick={() => !item.subItems && onNavigate(key)}
-                    className={`px-3 py-2 text-sm font-medium transition-colors ${
+                    className={`px-3 py-2 text-sm font-medium transition-colors outline-none ${
                       isSelected ? "text-[#c8923a]" : "text-[#3a2e24] hover:text-[#c8923a]"
                     }`}
                   >
@@ -86,7 +86,7 @@ export default function Navbar({ isLoggedIn, isAdmin, currentPage, onNavigate, o
                           <div key={sub.key} className="flex items-center">
                             <button
                               onClick={() => onNavigate(sub.key)}
-                              className="whitespace-nowrap px-5 py-2.5 text-[0.85rem] text-[#5d4037] hover:bg-[#fdf8f2] hover:text-[#c8923a] transition-colors"
+                              className="whitespace-nowrap px-5 py-2.5 text-[0.85rem] text-[#5d4037] hover:bg-[#fdf8f2] hover:text-[#c8923a] transition-colors outline-none"
                             >
                               {sub.label}
                             </button>
@@ -102,34 +102,33 @@ export default function Navbar({ isLoggedIn, isAdmin, currentPage, onNavigate, o
               );
             })}
 
-            {/* 로그인/로그아웃 버튼 */}
+            {/* 로그인/로그아웃 버튼 (디자인 유지) */}
             <li className="ml-2">
               {!isLoggedIn ? (
                 <button
                   onClick={() => onNavigate("login")}
-                  className="px-4 py-1.5 rounded-full bg-[#c8923a] text-white text-sm font-medium hover:bg-[#8b5e3c] transition-all shadow-sm"
+                  className="px-4 py-1.5 rounded-full bg-[#c8923a] text-white text-sm font-medium hover:bg-[#8b5e3c] transition-all shadow-sm active:scale-95"
                 >
                   로그인
                 </button>
               ) : (
                 <button
                   onClick={onLogout}
-                  className="px-4 py-1.5 rounded-full bg-[#eee3d5] text-[#5d4037] text-sm font-medium hover:bg-gray-200 transition-all"
+                  className="px-4 py-1.5 rounded-full bg-[#eee3d5] text-[#5d4037] text-sm font-medium hover:bg-gray-200 transition-all active:scale-95"
                 >
                   로그아웃
                 </button>
               )}
             </li>
 
-            {/* ⭐ 관리자 버튼 보안 수정: App에서 넘겨받은 isAdmin이 true일 때만 노출 
-                (App에서 이미 '관리자 주소'일 때만 true를 보내주도록 고쳤습니다) */}
+            {/* ⭐ 관리자 관제모드 버튼 (디자인 포인트 강화) */}
             {isLoggedIn && isAdmin && (
               <li className="ml-1">
                 <button
-                  onClick={() => onNavigate("pastor-office")}
-                  className="px-3 py-1.5 text-xs font-bold text-red-600 border border-red-200 rounded-full bg-red-50 hover:bg-red-100 animate-pulse shadow-sm"
+                  onClick={() => onNavigate("adminDashboard")}
+                  className="px-3 py-1.5 text-[0.7rem] font-black text-red-600 border border-red-200 rounded-full bg-red-50 hover:bg-red-500 hover:text-white hover:border-red-500 transition-all animate-pulse shadow-sm"
                 >
-                  관제모드 ON
+                  ⚙️ 관제모드 ON
                 </button>
               </li>
             )}
@@ -142,9 +141,9 @@ export default function Navbar({ isLoggedIn, isAdmin, currentPage, onNavigate, o
         </button>
       </div>
 
-      {/* 모바일 메뉴 레이어 (관리자 버튼 포함) */}
+      {/* 모바일 메뉴 레이어 (기존 디자인 복구) */}
       {menuOpen && (
-        <div className="sm:hidden bg-[#fdf8f2] border-t border-[#f5e6d3] py-4 shadow-inner">
+        <div className="sm:hidden bg-[#fdf8f2] border-t border-[#f5e6d3] py-4 shadow-inner animate-in slide-in-from-top duration-300">
           {activeNavKeys.map((key) => {
             const item = NAV_CONFIG[key];
             return (
@@ -181,14 +180,15 @@ export default function Navbar({ isLoggedIn, isAdmin, currentPage, onNavigate, o
               </div>
             );
           })}
-          {/* 모바일 관리자 버튼 */}
+          
+          {/* 모바일 전용 관리자 입장 버튼 */}
           {isLoggedIn && isAdmin && (
             <button
               onClick={() => {
-                onNavigate("pastor-office");
+                onNavigate("adminDashboard");
                 setMenuOpen(false);
               }}
-              className="w-full text-center py-4 text-red-600 font-bold bg-red-50 border-t border-red-100"
+              className="w-full text-center py-4 mt-2 text-red-600 font-black bg-red-50 border-y border-red-100"
             >
               🏛️ 관리자 관제 센터 입장
             </button>
