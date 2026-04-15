@@ -3,6 +3,7 @@ import cron from 'node-cron';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import multer from 'multer'; // [신규] 주보 파일 업로드용
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,38 +13,43 @@ const PORT = process.env.PORT || 10000;
 
 app.use(cors());
 app.use(express.json());
+// [신규] 업로드된 파일 접근을 위한 정적 폴더 개방
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
 /* ─────────────────────────────────────────
-    [행정부] 신도 명단 (기존 유지)
+    [행정부] 신도 및 데이터 보관소 (기존 유지)
 ───────────────────────────────────────── */
 const MEMBERS = [
-    { 
-      id: 1, 
-      name: "황의종", 
-      phone: "01025530691", 
-      role: "admin", 
-      status: "ACTIVE", 
-      activeTeams: 0 
-    },
-    { 
-      id: 2, 
-      name: "이준혁", 
-      phone: "01051581731", 
-      role: "user", 
-      status: "ACTIVE", 
-      activeTeams: 1 
-    },
+    { id: 1, name: "황의종", phone: "01025530691", role: "admin", status: "ACTIVE", activeTeams: 0 },
+    { id: 2, name: "이준혁", phone: "01051581731", role: "user", status: "ACTIVE", activeTeams: 1 },
     { id: 3, name: "김성도", phone: "01011112222", role: "user", status: "ACTIVE", activeTeams: 0 },
     { id: 4, name: "조열심", phone: "01033334444", role: "user", status: "ACTIVE", activeTeams: 2 }, 
     { id: 5, name: "박교우", phone: "01055556666", role: "user", status: "ACTIVE", activeTeams: 1 },
     { id: 6, name: "최집사", phone: "01099990000", role: "user", status: "ACTIVE", activeTeams: 1 } 
 ];
 
-// [보강] 기도 제목 데이터 보관소
 let PRAYERS = [
   { id: 1, content: "새학장 교회의 부흥을 위해 기도합니다.", authorName: "황의종", authorPhone: "01025530691", createdAt: new Date().toISOString() },
   { id: 2, content: "성경 필사 사역이 은혜롭게 진행되길 원합니다.", authorName: "이준혁", authorPhone: "01051581731", createdAt: new Date().toISOString() }
 ];
+
+// ⭐ [기술부 신규] 주일예배 동적 데이터 보관소
+let WORSHIP_DATA = {
+    videoUrl: "https://www.youtube.com/embed/현장예배코드",
+    sermonTitle: "주의 길을 예비하라",
+    sermonPassage: "마태복음 3:1-12",
+    bulletinUrl: "",
+    updatedAt: new Date().toISOString()
+};
+
+/* ─────────────────────────────────────────
+    [기술부 신규] 주보 업로드 엔진 (Multer)
+───────────────────────────────────────── */
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, 'public/uploads/bulletin/'),
+    filename: (req, file, cb) => cb(null, `bulletin_${Date.now()}${path.extname(file.originalname)}`)
+});
+const upload = multer({ storage: storage });
 
 /* ─────────────────────────────────────────
     [지휘부] 릴레이 상태 및 미션 관리 (기존 유지)
@@ -62,8 +68,41 @@ let relayStatus = {
 };
 
 /* ─────────────────────────────────────────
-    [기술부] 핵심 로직 엔진 (기존 기능 100% 유지)
+    [신규 API] 디자인부 요청 주일예배 동적 관리
 ───────────────────────────────────────── */
+
+// 1. 성도용 최신 예배 정보 조회
+app.get('/api/worship/current', (req, res) => {
+    res.json({ success: true, data: WORSHIP_DATA });
+});
+
+// 2. 관리자용 예배 정보 업데이트
+app.post('/api/admin/worship-update', (req, res) => {
+    const { videoUrl, sermonTitle, sermonPassage, bulletinUrl } = req.body;
+    
+    WORSHIP_DATA = {
+        ...WORSHIP_DATA,
+        videoUrl: videoUrl || WORSHIP_DATA.videoUrl,
+        sermonTitle: sermonTitle || WORSHIP_DATA.sermonTitle,
+        sermonPassage: sermonPassage || WORSHIP_DATA.sermonPassage,
+        bulletinUrl: bulletinUrl || WORSHIP_DATA.bulletinUrl,
+        updatedAt: new Date().toISOString()
+    };
+    
+    res.json({ success: true, message: "예배 정보가 실시간 반영되었습니다." });
+});
+
+// 3. 관리자용 주보 파일 업로드
+app.post('/api/admin/upload-bulletin', upload.single('bulletin'), (req, res) => {
+    if (!req.file) return res.status(400).json({ success: false, message: "파일이 없습니다." });
+    const fileUrl = `/uploads/bulletin/${req.file.filename}`;
+    res.json({ success: true, fileUrl });
+});
+
+/* ─────────────────────────────────────────
+    [기술부] 핵심 로직 및 기존 API (100% 호환 유지)
+───────────────────────────────────────── */
+
 const getActiveMissionCount = (phone) => {
     const user = MEMBERS.find(m => m.phone === phone);
     return user ? user.activeTeams : 0;
@@ -85,25 +124,9 @@ app.post('/api/admin/approve', (req, res) => {
     res.json({ success: true, message: `${type} 사역이 공식 승인되었습니다.` });
 });
 
-/* ─────────────────────────────────────────
-    [보강] 관제 센터 지원 API (로딩 해결용)
-───────────────────────────────────────── */
+app.get('/api/admin/users', (req, res) => res.json(MEMBERS));
 
-// 1. 관리자용 신도 명단 (AdminDashboard.jsx 연결)
-app.get('/api/admin/users', (req, res) => {
-    // 프론트엔드가 배열 형태를 바로 받을 수 있도록 보냅니다.
-    res.json(MEMBERS); 
-});
-
-// 2. 기도 데이터 (성도/목사님 공통 연결)
-app.get('/api/prayers', (req, res) => {
-    // success: true 구조를 맞춰줘야 프론트엔드 로딩이 끝납니다.
-    res.json({ success: true, data: PRAYERS });
-});
-
-/* ─────────────────────────────────────────
-    [기존 API 유지]
-───────────────────────────────────────── */
+app.get('/api/prayers', (req, res) => res.json({ success: true, data: PRAYERS }));
 
 app.get('/api/relay/status', (req, res) => {
     const now = Date.now();
@@ -166,4 +189,4 @@ cron.schedule('* * * * *', () => {
     }
 });
 
-app.listen(PORT, () => console.log(`🚀 Server Running with Administrative Rules`));
+app.listen(PORT, () => console.log(`🚀 Server Running with Worship Admin Support`));
