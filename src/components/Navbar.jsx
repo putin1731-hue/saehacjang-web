@@ -9,7 +9,14 @@ const NAV_CONFIG = {
       { label: "교회비전", key: "vision" },
     ],
   },
-  worship: { label: "주일예배", key: "worship" },
+  // [디자인부 수정] 주일예배 항목을 서브 메뉴 구조로 확장
+  worship: { 
+    label: "주일예배", 
+    subItems: [
+      { label: "예배영상", key: "worship_video" },
+      { label: "온라인주보", key: "bulletin" },
+    ],
+  },
   activity: {
     label: "교회활동",
     subItems: [
