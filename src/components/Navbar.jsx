@@ -14,7 +14,7 @@ const NAV_CONFIG = {
     label: "주일예배", 
     subItems: [
       { label: "예배영상", key: "worship_video" },
-      { label: "온라인주보", key: "bulletin" },
+      { label: "주보", key: "bulletin" },
     ],
   },
   activity: {
