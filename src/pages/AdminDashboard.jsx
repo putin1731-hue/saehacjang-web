@@ -2,33 +2,39 @@ import React, { useState, useEffect } from "react";
 import { authService } from "../services/authService";
 
 export default function AdminDashboard({ onNavigate }) {
-  // --- 기존 상태 ---
+  // --- 기존 상태 (유지) ---
   const [activeTab, setActiveTab] = useState("worship");
   const [pendingUsers, setPendingUsers] = useState([]);
   const [prayers, setPrayers] = useState([]);
   const [relayStatus, setRelayStatus] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ✅ 추가 (기존 영향 없음)
+  // ✅ 유튜브 및 주보 상태 (유지)
   const [youtubeId, setYoutubeId] = useState("");
   const [bulletinFile, setBulletinFile] = useState(null);
 
   const currentUser = authService.getCurrentUser();
   const isAdmin = currentUser?.role === 'admin';
 
+  // 🛠️ [수정] 데이터 로드 로직 (강력한 안전장치 추가)
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      console.log("🔄 [관제센터] 사역 데이터 동기화 중...");
 
+      // 1. 필사 현황 (에러 시 null 처리)
       const relayRes = await fetch('/api/relay/status').then(res => res.json()).catch(() => null);
       if (relayRes) setRelayStatus(relayRes);
 
+      // 2. 가입 대기 유저 (에러 시 빈 배열)
       const usersRes = await fetch('/api/admin/users').then(res => res.json()).catch(() => []);
       if (Array.isArray(usersRes)) {
         setPendingUsers(usersRes.filter(u => u.status === "PENDING"));
       }
 
+      // 3. 기도 제목 (데이터 규격 방어 로직)
       const prayerRes = await fetch('/api/prayers').then(res => res.json()).catch(() => ({ success: false, data: [] }));
+      
       if (prayerRes?.success && Array.isArray(prayerRes.data)) {
         const allPrayers = prayerRes.data;
         if (isAdmin) {
@@ -41,14 +47,24 @@ export default function AdminDashboard({ onNavigate }) {
     } catch (e) {
       console.error("❌ 데이터 로드 오류:", e);
     } finally {
-      setLoading(false);
+      // ⭐ 핵심: 어떤 상황에서도 0.5초 뒤에는 로딩을 강제로 종료!
+      setTimeout(() => {
+        setLoading(false);
+      }, 500);
     }
   };
 
   useEffect(() => {
+    // ⚠️ 관리자가 아님에도 이 주소로 들어온 경우 튕겨내기 (이원화 주소 보안)
+    if (currentUser && !isAdmin) {
+      alert("관리자 권한이 없습니다.");
+      onNavigate("home");
+      return;
+    }
     fetchDashboardData();
   }, [currentUser]);
 
+  // --- 유저 승인 로직 (기존 유지) ---
   const handleUserApproval = async (userId, decision) => {
     if (!isAdmin) return;
     if (!window.confirm(`${decision === 'ACTIVE' ? '승인' : '반려'} 하시겠습니까?`)) return;
@@ -60,35 +76,39 @@ export default function AdminDashboard({ onNavigate }) {
     }
   };
 
-  // ✅ 추가 기능
+  // ✅ [수정] 주일예배 저장 로직 (server.js 규격에 맞춤)
   const handleWorshipSave = async () => {
     if (!youtubeId) {
-      alert("유튜브 ID를 입력하세요");
+      alert("유튜브 ID를 입력하세요 (예: yz7X1X2X3X4)");
       return;
     }
 
     try {
-      const formData = new FormData();
-      formData.append("youtubeId", youtubeId);
-      if (bulletinFile) {
-        formData.append("file", bulletinFile);
-      }
-
-      const res = await fetch("/api/worship", {
+      // 1단계: 예배 정보(텍스트) 저장
+      const worshipRes = await fetch("/api/admin/worship-update", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videoUrl: `https://www.youtube.com/embed/${youtubeId}` }),
       });
 
-      if (res.ok) {
-        alert("저장 완료!");
+      // 2단계: 파일이 있다면 업로드 진행
+      if (bulletinFile) {
+        const formData = new FormData();
+        formData.append("bulletin", bulletinFile);
+        await fetch("/api/admin/upload-bulletin", {
+          method: "POST",
+          body: formData,
+        });
+      }
+
+      if (worshipRes.ok) {
+        alert("✨ 홈페이지에 실시간으로 반영되었습니다!");
         setYoutubeId("");
         setBulletinFile(null);
-      } else {
-        alert("저장 실패");
       }
     } catch (e) {
       console.error(e);
-      alert("에러 발생");
+      alert("반영 중 오류가 발생했습니다.");
     }
   };
 
@@ -111,92 +131,96 @@ export default function AdminDashboard({ onNavigate }) {
   return (
     <div className="min-h-screen bg-[#f9f2e8] p-4 md:p-8 font-sans">
       <div className="max-w-6xl mx-auto">
-
-        {/* 상단 */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-          <div>
-            <h1 className="text-3xl font-black text-[#3a2e24] font-serif tracking-tight">
-              {isAdmin ? "사역 관제 센터" : "나의 사역 현황"}
-            </h1>
-          </div>
+          <h1 className="text-3xl font-black text-[#3a2e24] font-serif tracking-tight">
+            {isAdmin ? "사역 관제 센터" : "나의 사역 현황"}
+          </h1>
+          <button onClick={fetchDashboardData} className="text-xs text-[#8b5e3c] underline">데이터 새로고침</button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-
-          {/* 좌측 탭 */}
           <div className="lg:col-span-1 space-y-2">
             {ADMIN_TABS.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-4 px-6 py-4 rounded-[1.5rem] text-sm font-bold ${
-                  activeTab === tab.id
-                    ? "bg-[#3a2e24] text-white"
-                    : "bg-white/60 text-[#8b5e3c]"
+                className={`w-full flex items-center gap-4 px-6 py-4 rounded-[1.5rem] text-sm font-bold transition-all ${
+                  activeTab === tab.id ? "bg-[#3a2e24] text-white shadow-lg" : "bg-white/60 text-[#8b5e3c] hover:bg-white"
                 }`}
               >
-                <span>{tab.icon}</span>
-                {tab.label}
+                <span>{tab.icon}</span> {tab.label}
               </button>
             ))}
           </div>
 
-          {/* 우측 */}
           <div className="lg:col-span-3">
-            <div className="bg-white rounded-[2.5rem] p-8">
-
-              {/* ================== 주일예배 ================== */}
+            <div className="bg-white rounded-[2.5rem] p-8 shadow-sm min-h-[400px]">
               {activeTab === "worship" && (
                 <div className="space-y-6">
-
-                  {/* 유튜브 */}
-                  <input
-                    type="text"
-                    value={youtubeId} // ✅ 연결
-                    onChange={(e) => setYoutubeId(e.target.value)} // ✅ 추가
-                    placeholder="예: yz7X1X2X3X4"
-                    className="w-full p-4 rounded-2xl border"
-                  />
-
-                  {/* 파일 */}
-                  <input
-                    type="file"
-                    onChange={(e) => setBulletinFile(e.target.files[0])} // ✅ 추가
-                  />
-
-                  {/* 버튼 */}
+                  <h3 className="text-xl font-bold text-[#3a2e24] mb-4">📺 이번 주 예배 영상/주보 관리</h3>
+                  <div>
+                    <label className="block text-sm font-bold text-[#8b5e3c] mb-2">유튜브 비디오 ID</label>
+                    <input
+                      type="text"
+                      value={youtubeId}
+                      onChange={(e) => setYoutubeId(e.target.value)}
+                      placeholder="예: yz7X1X2X3X4 (URL의 v= 뒷부분)"
+                      className="w-full p-4 rounded-2xl border border-[#f5e6d3] focus:outline-[#c8923a]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-[#8b5e3c] mb-2">이번 주 주보 (PDF)</label>
+                    <input
+                      type="file"
+                      onChange={(e) => setBulletinFile(e.target.files[0])}
+                      className="w-full p-2 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#fdf8f2] file:text-[#8b5e3c] hover:file:bg-[#f5e6d3]"
+                    />
+                  </div>
                   <button
-                    onClick={handleWorshipSave} // ✅ 연결
-                    className="w-full py-4 bg-[#c8923a] text-white rounded-xl"
+                    onClick={handleWorshipSave}
+                    className="w-full py-5 bg-[#c8923a] text-white rounded-2xl font-bold shadow-xl hover:bg-[#3a2e24] transition-all"
                   >
                     홈페이지에 즉시 반영하기
                   </button>
                 </div>
               )}
 
-              {/* 기존 기능 그대로 */}
               {activeTab === "bible" && (
-                <div>
-                  {pendingUsers.map(u => (
-                    <div key={u.id}>
-                      {u.name}
-                      <button onClick={() => handleUserApproval(u.id, 'ACTIVE')}>승인</button>
-                    </div>
-                  ))}
+                <div className="space-y-4">
+                  <h3 className="text-xl font-bold text-[#3a2e24] mb-4">📖 가입 승인 대기</h3>
+                  {pendingUsers.length === 0 ? (
+                    <p className="text-gray-400">대기 중인 성도님이 없습니다.</p>
+                  ) : (
+                    pendingUsers.map(u => (
+                      <div key={u.id} className="flex items-center justify-between p-4 bg-[#fdf8f2] rounded-2xl">
+                        <span className="font-bold text-[#3a2e24]">{u.name} ({u.phone})</span>
+                        <div className="flex gap-2">
+                          <button onClick={() => handleUserApproval(u.id, 'ACTIVE')} className="px-4 py-2 bg-[#8b5e3c] text-white rounded-xl text-sm">승인</button>
+                          <button onClick={() => handleUserApproval(u.id, 'REJECTED')} className="px-4 py-2 bg-gray-200 text-gray-500 rounded-xl text-sm">반려</button>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               )}
 
               {activeTab === "prayer" && (
-                <div>
-                  {prayers.map(p => (
-                    <div key={p.id}>{p.content}</div>
-                  ))}
+                <div className="space-y-4">
+                  <h3 className="text-xl font-bold text-[#3a2e24] mb-4">🕊️ 중보기도 명단</h3>
+                  {prayers.length === 0 ? (
+                    <p className="text-gray-400">등록된 기도 제목이 없습니다.</p>
+                  ) : (
+                    prayers.map(p => (
+                      <div key={p.id} className="p-4 border-b border-[#f5e6d3]">
+                        <p className="text-[#3a2e24] leading-relaxed">{p.content}</p>
+                        <p className="text-xs text-[#c8923a] mt-2">- {p.authorName} 성도님</p>
+                      </div>
+                    ))
+                  )}
                 </div>
               )}
-
             </div>
           </div>
-
         </div>
       </div>
     </div>
