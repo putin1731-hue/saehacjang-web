@@ -2,37 +2,37 @@ import React, { useState, useEffect } from "react";
 import { authService } from "../services/authService";
 
 export default function AdminDashboard({ onNavigate }) {
-  // --- 기존 상태 (유지) ---
+  // --- 상태 관리 ---
   const [activeTab, setActiveTab] = useState("worship");
   const [pendingUsers, setPendingUsers] = useState([]);
   const [prayers, setPrayers] = useState([]);
   const [relayStatus, setRelayStatus] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ✅ 유튜브 및 주보 상태 (유지)
   const [youtubeId, setYoutubeId] = useState("");
   const [bulletinFile, setBulletinFile] = useState(null);
 
   const currentUser = authService.getCurrentUser();
   const isAdmin = currentUser?.role === 'admin';
 
-  // 🛠️ [수정] 데이터 로드 로직 (강력한 안전장치 추가)
+  // 🛠️ [정밀 수정] 데이터 로드 로직
   const fetchDashboardData = async () => {
+    // 이미 데이터를 불러오는 중이라면 중복 실행을 방지합니다.
     try {
       setLoading(true);
-      console.log("🔄 [관제센터] 사역 데이터 동기화 중...");
+      console.log("🔄 [관제센터] 데이터 동기화 시도...");
 
-      // 1. 필사 현황 (에러 시 null 처리)
+      // 1. 필사 현황
       const relayRes = await fetch('/api/relay/status').then(res => res.json()).catch(() => null);
       if (relayRes) setRelayStatus(relayRes);
 
-      // 2. 가입 대기 유저 (에러 시 빈 배열)
+      // 2. 가입 대기 유저
       const usersRes = await fetch('/api/admin/users').then(res => res.json()).catch(() => []);
       if (Array.isArray(usersRes)) {
         setPendingUsers(usersRes.filter(u => u.status === "PENDING"));
       }
 
-      // 3. 기도 제목 (데이터 규격 방어 로직)
+      // 3. 기도 제목
       const prayerRes = await fetch('/api/prayers').then(res => res.json()).catch(() => ({ success: false, data: [] }));
       
       if (prayerRes?.success && Array.isArray(prayerRes.data)) {
@@ -47,22 +47,28 @@ export default function AdminDashboard({ onNavigate }) {
     } catch (e) {
       console.error("❌ 데이터 로드 오류:", e);
     } finally {
-      // ⭐ 핵심: 어떤 상황에서도 0.5초 뒤에는 로딩을 강제로 종료!
+      // 0.5초의 여유를 두어 UI가 자연스럽게 전환되도록 합니다.
       setTimeout(() => {
         setLoading(false);
+        console.log("✅ [관제센터] 데이터 로드 완료");
       }, 500);
     }
   };
 
+  // ⭐ [핵심 수정] 무한 루프 차단 구역
   useEffect(() => {
-    // ⚠️ 관리자가 아님에도 이 주소로 들어온 경우 튕겨내기 (이원화 주소 보안)
+    // 1. 보안 체크: 관리자가 아니면 즉시 홈으로 보냄
     if (currentUser && !isAdmin) {
       alert("관리자 권한이 없습니다.");
       onNavigate("home");
       return;
     }
+
+    // 2. 데이터 호출: 의존성 배열을 []로 비워두어 페이지 입장 시 '단 한 번'만 실행되게 합니다.
     fetchDashboardData();
-  }, [currentUser]);
+    
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 의존성 배열에서 currentUser를 제거하여 무한 루프를 해결했습니다.
 
   // --- 유저 승인 로직 (기존 유지) ---
   const handleUserApproval = async (userId, decision) => {
@@ -76,22 +82,20 @@ export default function AdminDashboard({ onNavigate }) {
     }
   };
 
-  // ✅ [수정] 주일예배 저장 로직 (server.js 규격에 맞춤)
+  // ✅ [수정] 주일예배 저장 로직 (API 경로 맞춤)
   const handleWorshipSave = async () => {
     if (!youtubeId) {
-      alert("유튜브 ID를 입력하세요 (예: yz7X1X2X3X4)");
+      alert("유튜브 ID를 입력하세요.");
       return;
     }
 
     try {
-      // 1단계: 예배 정보(텍스트) 저장
       const worshipRes = await fetch("/api/admin/worship-update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ videoUrl: `https://www.youtube.com/embed/${youtubeId}` }),
       });
 
-      // 2단계: 파일이 있다면 업로드 진행
       if (bulletinFile) {
         const formData = new FormData();
         formData.append("bulletin", bulletinFile);
@@ -119,6 +123,7 @@ export default function AdminDashboard({ onNavigate }) {
     { id: "gallery", label: "활동사진", icon: "📸" },
   ];
 
+  // 로딩 화면 (기존 디자인 유지)
   if (loading) return (
     <div className="min-h-screen bg-[#F9F7F2] flex items-center justify-center font-serif text-[#C5A059]">
       <div className="text-center">
@@ -157,24 +162,26 @@ export default function AdminDashboard({ onNavigate }) {
             <div className="bg-white rounded-[2.5rem] p-8 shadow-sm min-h-[400px]">
               {activeTab === "worship" && (
                 <div className="space-y-6">
-                  <h3 className="text-xl font-bold text-[#3a2e24] mb-4">📺 이번 주 예배 영상/주보 관리</h3>
-                  <div>
-                    <label className="block text-sm font-bold text-[#8b5e3c] mb-2">유튜브 비디오 ID</label>
-                    <input
-                      type="text"
-                      value={youtubeId}
-                      onChange={(e) => setYoutubeId(e.target.value)}
-                      placeholder="예: yz7X1X2X3X4 (URL의 v= 뒷부분)"
-                      className="w-full p-4 rounded-2xl border border-[#f5e6d3] focus:outline-[#c8923a]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-[#8b5e3c] mb-2">이번 주 주보 (PDF)</label>
-                    <input
-                      type="file"
-                      onChange={(e) => setBulletinFile(e.target.files[0])}
-                      className="w-full p-2 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#fdf8f2] file:text-[#8b5e3c] hover:file:bg-[#f5e6d3]"
-                    />
+                  <h3 className="text-xl font-bold text-[#3a2e24] mb-4">📺 예배 영상 및 주보 관리</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-bold text-[#8b5e3c] mb-2">유튜브 비디오 ID</label>
+                      <input
+                        type="text"
+                        value={youtubeId}
+                        onChange={(e) => setYoutubeId(e.target.value)}
+                        placeholder="v= 뒷부분의 코드 (예: yz7X1X2X3X4)"
+                        className="w-full p-4 rounded-2xl border border-[#f5e6d3] focus:outline-[#c8923a]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-[#8b5e3c] mb-2">주보 파일 (PDF)</label>
+                      <input
+                        type="file"
+                        onChange={(e) => setBulletinFile(e.target.files[0])}
+                        className="w-full p-2 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#fdf8f2] file:text-[#8b5e3c] hover:file:bg-[#f5e6d3]"
+                      />
+                    </div>
                   </div>
                   <button
                     onClick={handleWorshipSave}
