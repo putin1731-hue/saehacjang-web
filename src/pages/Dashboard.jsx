@@ -5,10 +5,9 @@ export default function Dashboard({ onNavigate }) {
   const [relayStatus, setRelayStatus] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 현재 로그인한 성도 정보
+  // 1. 현재 로그인한 성도 정보 가져오기
   const currentUser = authService.getCurrentUser();
 
-  // 데이터 로드 로직
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
@@ -26,7 +25,6 @@ export default function Dashboard({ onNavigate }) {
       if (relay) {
         setRelayStatus(relay);
       } else {
-        // 데이터가 없을 시 기본값 (디자인 유지용 샘플 데이터)
         setRelayStatus({
           currentBookName: "마태복음",
           currentChapterNum: 5,
@@ -46,6 +44,9 @@ export default function Dashboard({ onNavigate }) {
     fetchDashboardData();
   }, []);
 
+  // ⭐ [권한 체크] 로그인한 성도와 현재 주자의 이름이 같은지 확인
+  const isMyTurn = relayStatus?.currentRunner?.name === currentUser?.name;
+
   if (loading) return (
     <div className="min-h-screen bg-[#F9F7F2] flex items-center justify-center font-serif text-[#C5A059]">
       <div className="text-center">
@@ -59,7 +60,7 @@ export default function Dashboard({ onNavigate }) {
     <div className="min-h-screen bg-[#F3F4F6] p-4 md:p-8 font-sans">
       <div className="max-w-6xl mx-auto">
         
-        {/* [디자인] 상단 대시보드 헤더 - 성도 맞춤형 따뜻한 톤 */}
+        {/* 헤더 섹션 (기존 디자인 유지) */}
         <div className="flex justify-between items-center mb-8 bg-[#5d4037] p-8 rounded-[2rem] text-white shadow-2xl">
           <div>
             <h1 className="text-3xl font-black font-serif tracking-tight">🕊️ 나의 사역 현황</h1>
@@ -79,28 +80,50 @@ export default function Dashboard({ onNavigate }) {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
-          {/* [좌측] 성도 환영 및 사역 독려 카드 */}
+          {/* [좌측] 독려 카드 - 버튼 비활성화 로직 적용 */}
           <div className="bg-white rounded-[2rem] p-10 shadow-lg border border-gray-100 flex flex-col items-center justify-center text-center animate-in fade-in slide-in-from-left duration-700">
-            <div className="w-20 h-20 bg-[#F9F7F2] rounded-full flex items-center justify-center text-4xl mb-6 shadow-inner">🌿</div>
-            <h3 className="text-2xl font-bold text-[#3a2e24] mb-4 font-serif italic">"말씀 안에 거하는 평안"</h3>
+            <div className="w-20 h-20 bg-[#F9F7F2] rounded-full flex items-center justify-center text-4xl mb-6 shadow-inner">
+              {isMyTurn ? "✍️" : "🌿"}
+            </div>
+            <h3 className="text-2xl font-bold text-[#3a2e24] mb-4 font-serif italic">
+              {isMyTurn ? "기다리던 성도님의 차례입니다!" : "말씀 안에 거하는 평안"}
+            </h3>
             <p className="text-gray-500 leading-relaxed max-w-xs text-sm">
-              성도님은 현재 새학장 필사 릴레이의<br/>
-              소중한 동역자로 함께하고 계십니다.<br/>
-              오늘도 주시는 말씀으로 승리하세요!
+              {isMyTurn 
+                ? "지금 바로 오늘의 말씀을 기록하며\n공동체에 은혜를 흘려보내 주세요."
+                : "성도님은 현재 새학장 필사 릴레이의\n소중한 동역자로 함께하고 계십니다.\n오늘도 주시는 말씀으로 승리하세요!"}
             </p>
-            <button 
-              onClick={() => onNavigate("bible")}
-              className="mt-8 px-10 py-3.5 bg-[#C5A059] text-white rounded-full font-bold text-sm shadow-lg hover:bg-[#A68648] transition-all transform active:scale-95"
-            >
-              필사 계속하기 ➔
-            </button>
+
+            {/* ⭐ 버튼 조건부 렌더링 (UI/UX 유지) */}
+            {isMyTurn ? (
+              <button 
+                onClick={() => onNavigate("bible")}
+                className="mt-8 px-10 py-3.5 bg-[#C5A059] text-white rounded-full font-bold text-sm shadow-lg hover:bg-[#A68648] transition-all transform active:scale-95"
+              >
+                필사 시작하기 ➔
+              </button>
+            ) : (
+              <div className="mt-8 flex flex-col items-center gap-2">
+                <button 
+                  disabled
+                  className="px-10 py-3.5 bg-gray-200 text-gray-400 rounded-full font-bold text-sm cursor-not-allowed"
+                >
+                  기다리는 중...
+                </button>
+                <p className="text-[10px] text-red-400 font-medium">
+                  현재 주자 [{relayStatus?.currentRunner?.name}] 성도님만 필사가 가능합니다.
+                </p>
+              </div>
+            )}
           </div>
 
-          {/* [우측] 필사 사역 실시간 현황 (공동체 데이터) */}
-          <div className="bg-white rounded-[2rem] p-8 shadow-lg border border-gray-200 animate-in fade-in slide-in-from-right duration-700">
+          {/* [우측] 실시간 현황 (기존 디자인 유지) */}
+          <div className="bg-white rounded-[2rem] p-8 shadow-lg border border-gray-100 animate-in fade-in slide-in-from-right duration-700">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold text-[#3a2e24] font-serif">📖 필사 사역 실시간 현황</h3>
-              <span className="text-[10px] text-[#C5A059] font-black uppercase tracking-tighter">Live Update</span>
+              <span className={`text-[10px] font-black uppercase tracking-tighter ${isMyTurn ? "text-green-500 animate-pulse" : "text-[#C5A059]"}`}>
+                {isMyTurn ? "Your Turn Now" : "Live Update"}
+              </span>
             </div>
             
             {relayStatus ? (
@@ -113,9 +136,11 @@ export default function Dashboard({ onNavigate }) {
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4 text-sm font-sans">
-                  <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100">
+                  <div className={`p-5 rounded-2xl border transition-all ${isMyTurn ? "bg-green-50 border-green-200" : "bg-gray-50 border-gray-100"}`}>
                     <p className="text-gray-400 mb-1 text-[10px] font-bold uppercase tracking-tighter">현재 주자</p>
-                    <p className="font-bold text-[#3a2e24]">{relayStatus.currentRunner?.name} 성도</p>
+                    <p className={`font-bold ${isMyTurn ? "text-green-700" : "text-[#3a2e24]"}`}>
+                      {relayStatus.currentRunner?.name} 성도 {isMyTurn && "(나)"}
+                    </p>
                   </div>
                   <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100">
                     <p className="text-gray-400 mb-1 text-[10px] font-bold uppercase tracking-tighter">누적 기록</p>
