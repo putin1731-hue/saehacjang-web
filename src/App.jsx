@@ -16,11 +16,13 @@ import Pending from "./pages/Pending";
 import Bulletin from "./pages/Bulletin";
 import WorshipVideo from "./pages/WorshipVideo";
 
+// AuthContext 사용
 import { AuthProvider, useAuth } from "./context/AuthContext";
 
 function AppInner() {
   const { user, logout } = useAuth();
   
+  // 새로고침 시에도 페이지 유지
   const [currentPage, setCurrentPage] = useState(() => {
     const savedPage = localStorage.getItem("current_page");
     return savedPage || "home"; 
@@ -36,40 +38,65 @@ function AppInner() {
     window.scrollTo(0, 0);
   };
 
-  // [수정된 렌더링 엔진: 주소 체계 이원화]
+  // [수정된 렌더링 엔진: 관리자 기능 및 기존 페이지 완벽 호환]
   const renderPage = () => {
-    // 1. 관리자 전용 통로 (admin-office) 분리
-    // 주소가 adminDashboard 혹은 admin-office일 때 관리자 체크
+    
+    // 1. 관리자 전용 보안 통로 (이원화 주소 대응)
+    // adminDashboard 혹은 admin-office 주소로 접근 시
     if (currentPage === "adminDashboard" || currentPage === "admin-office") {
       if (!isAdmin) {
-        console.warn("⛔ 관리자 외 접근 차단");
+        console.warn("⛔ 관리자 외 접근 차단됨");
         return <Home onNavigate={navigate} currentUser={user} />;
       }
-      // 관리자라면 로딩 걱정 없는 전용 대시보드로 연결
+      // 관리자일 경우 최신 업데이트 기능이 포함된 대시보드 렌더링
       return <AdminDashboard onNavigate={navigate} user={user} />;
     }
 
-    // 2. 공용 보안 체크 (기존 유지)
+    // 2. 공용 보안 체크 (로그인 필수 페이지)
     const protectedPages = ["prayer", "dashboard", "bible", "worship_video", "bulletin"];
     if (protectedPages.includes(currentPage) && !isLoggedIn) {
+      console.log("🔒 로그인 필요 페이지 접근 - 로그인으로 리다이렉트");
       return <Login onNavigate={navigate} />;
     }
 
-    // 3. 일반 페이지 스위칭 (기본 기능 유지)
+    // 3. 페이지 스위칭 로직 (기존 디자인 및 기능 100% 유지)
     switch (currentPage) {
-      case "dashboard": return <Dashboard onNavigate={navigate} user={user} />;
-      case "worship_video": return <WorshipVideo onNavigate={navigate} />;
-      case "bulletin": return <Bulletin onNavigate={navigate} />;
-      case "history": return <ChurchHistory onNavigate={navigate} />;
-      case "pastor": return <PastorGreeting onNavigate={navigate} />;
-      case "vision": return <Vision onNavigate={navigate} />;
-      case "login": return <Login onNavigate={navigate} />;
-      case "signup": return <Signup onNavigate={navigate} />;
-      case "pending": return <Pending onNavigate={navigate} />;
-      case "prayer": return <PrayerBoard currentUser={user} onNavigate={navigate} />;
-      case "bible": return <BibleWrite onFinish={() => navigate("home")} />;
+      case "dashboard": 
+        return <Dashboard onNavigate={navigate} user={user} />;
+      
+      case "worship_video": 
+        return <WorshipVideo onNavigate={navigate} />;
+      
+      case "bulletin": 
+        return <Bulletin onNavigate={navigate} />;
+      
+      case "prayer": 
+        return <PrayerBoard currentUser={user} onNavigate={navigate} />;
+      
+      case "bible": 
+        return <BibleWrite onFinish={() => navigate("home")} />;
+
+      case "history": 
+        return <ChurchHistory onNavigate={navigate} />;
+
+      case "pastor": 
+        return <PastorGreeting onNavigate={navigate} />;
+
+      case "vision": 
+        return <Vision onNavigate={navigate} />;
+
+      case "login": 
+        return <Login onNavigate={navigate} />;
+
+      case "signup": 
+        return <Signup onNavigate={navigate} />;
+
+      case "pending": 
+        return <Pending onNavigate={navigate} />;
+
       case "home":
-      default: return <Home onNavigate={navigate} currentUser={user} />;
+      default: 
+        return <Home onNavigate={navigate} currentUser={user} />;
     }
   };
 
@@ -91,6 +118,8 @@ function AppInner() {
         onLogout={handleManualLogout} 
         user={user}
       />
+      
+      {/* Navbar 높이를 고려한 패딩 */}
       <div className="pt-[70px]">
         {renderPage()}
       </div>

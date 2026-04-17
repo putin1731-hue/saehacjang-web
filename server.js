@@ -16,7 +16,7 @@ app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
 /* ─────────────────────────────────────────
-    [행정부] 데이터 보관소 (기존 유지)
+    [행정부] 데이터 보관소 (기존 유지 및 보강)
 ───────────────────────────────────────── */
 const MEMBERS = [
     { id: 1, name: "황의종", phone: "01025530691", role: "admin", status: "ACTIVE", activeTeams: 0 },
@@ -27,9 +27,10 @@ const MEMBERS = [
     { id: 6, name: "최집사", phone: "01099990000", role: "user", status: "ACTIVE", activeTeams: 1 } 
 ];
 
+// ⭐ PRAYERS 데이터에 isAnonymous(익명여부) 속성 대응 추가
 let PRAYERS = [
-  { id: 1, content: "새학장 교회의 부흥을 위해 기도합니다.", authorName: "황의종", authorPhone: "01025530691", createdAt: new Date().toISOString() },
-  { id: 2, content: "성경 필사 사역이 은혜롭게 진행되길 원합니다.", authorName: "이준혁", authorPhone: "01051581731", createdAt: new Date().toISOString() }
+  { id: 1, content: "새학장 교회의 부흥을 위해 기도합니다.", authorName: "황의종", authorPhone: "01025530691", isAnonymous: false, createdAt: new Date().toISOString() },
+  { id: 2, content: "성경 필사 사역이 은혜롭게 진행되길 원합니다.", authorName: "이준혁", authorPhone: "01051581731", isAnonymous: true, createdAt: new Date().toISOString() }
 ];
 
 let WORSHIP_DATA = {
@@ -66,20 +67,16 @@ let relayStatus = {
 };
 
 /* ─────────────────────────────────────────
-    [기술부 수정] 관제 센터 지원 API (로딩 해결의 핵심)
+    [보강 API] 관제 센터 지원 (Dashboard 통신 규격 일치)
 ───────────────────────────────────────── */
 
-// 1. 관리자용 신도 명단 조회 (배열 구조 안정화)
 app.get('/api/admin/users', (req, res) => {
     console.log("👤 [관제센터] 명단 요청 수신");
-    // 프론트엔드 AdminDashboard에서 Array.isArray()를 통과하기 위해 보장된 리스트 반환
     res.json(MEMBERS || []); 
 });
 
-// 2. 기도 데이터 조회 (데이터 상자 구조 명확화)
 app.get('/api/prayers', (req, res) => {
     console.log("🕊️ [관제센터] 기도 제목 데이터 요청");
-    // 프론트엔드에서 prayerRes?.success와 prayerRes.data를 찾으므로 구조를 일치시킵니다.
     res.status(200).json({ 
         success: true, 
         data: PRAYERS || [] 
@@ -87,28 +84,34 @@ app.get('/api/prayers', (req, res) => {
 });
 
 /* ─────────────────────────────────────────
-    [주일예배 관리 API] - 기존 로직 유지
+    [주일예배 관리 API] - 관리자 업데이트 기능 통합
 ───────────────────────────────────────── */
+
+// 1. 성도용 조회 API
 app.get('/api/worship/current', (req, res) => {
     res.json({ success: true, data: WORSHIP_DATA });
 });
 
+// 2. 관리자용 정보 업데이트 API
 app.post('/api/admin/worship-update', (req, res) => {
-    const { videoUrl, sermonTitle, sermonPassage, bulletinUrl } = req.body;
+    const { videoUrl, sermonTitle, sermonPassage } = req.body;
     WORSHIP_DATA = {
         ...WORSHIP_DATA,
         videoUrl: videoUrl || WORSHIP_DATA.videoUrl,
         sermonTitle: sermonTitle || WORSHIP_DATA.sermonTitle,
         sermonPassage: sermonPassage || WORSHIP_DATA.sermonPassage,
-        bulletinUrl: bulletinUrl || WORSHIP_DATA.bulletinUrl,
         updatedAt: new Date().toISOString()
     };
+    console.log("📺 [ADMIN] 예배 영상 정보가 업데이트 되었습니다.");
     res.json({ success: true, message: "예배 정보 반영 완료" });
 });
 
+// 3. 관리자용 주보 파일 업로드 API
 app.post('/api/admin/upload-bulletin', upload.single('bulletin'), (req, res) => {
     if (!req.file) return res.status(400).json({ success: false, message: "파일 없음" });
     const fileUrl = `/uploads/bulletin/${req.file.filename}`;
+    WORSHIP_DATA.bulletinUrl = fileUrl; // 서버 메모리에 경로 저장
+    console.log("📂 [ADMIN] 주보 파일 업로드 완료:", fileUrl);
     res.json({ success: true, fileUrl });
 });
 
@@ -162,4 +165,4 @@ cron.schedule('* * * * *', () => {
     }
 });
 
-app.listen(PORT, () => console.log(`🚀 Server Running with Administrative Rules`));
+app.listen(PORT, () => console.log(`🚀 Server Running with Administrative Controls`));
