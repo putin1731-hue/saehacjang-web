@@ -1,54 +1,101 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
 
-export default function WorshipVideo({ onNavigate }) {
-  // 실제 목사님 유튜브 채널 ID나 영상 ID를 여기에 넣으시면 됩니다.
-  const videoId = "your-video-id"; 
+export default function WorshipVideo() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+  const [worshipList, setWorshipList] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchList = async () => {
+    const res = await fetch('/api/worship/list').then(r => r.json());
+    setWorshipList(res.data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchList(); }, []);
+
+  // ✅ 관리자 전용 기능: 추가/저장/삭제
+  const handleAdd = () => setWorshipList([{ id: `temp-${Date.now()}`, sermonTitle: "", videoUrl: "", isNew: true }, ...worshipList]);
+  
+  const handleSave = async (item) => {
+    await fetch('/api/admin/worship-update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(item)
+    });
+    alert("저장되었습니다.");
+    fetchList();
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("삭제하시겠습니까?")) return;
+    await fetch('/api/admin/worship-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: [id] })
+    });
+    fetchList();
+  };
+
+  if (loading) return <div className="p-20 text-center">은혜로운 영상을 불러오는 중...</div>;
 
   return (
-    <div className="min-h-screen bg-[#F9F7F2] py-12 px-6 font-sans">
-      <div className="max-w-5xl mx-auto">
-        {/* 상단 헤더 */}
-        <div className="mb-8 border-b-2 border-[#E9DCC9] pb-6 flex justify-between items-end">
-          <div>
-            <h1 className="text-3xl font-black text-[#3a2e24] tracking-tighter font-serif">예배 영상</h1>
-            <p className="text-[#8b5e3c] mt-2 italic font-serif">"신령과 진정으로 드리는 거룩한 예배"</p>
-          </div>
-          <button 
-            onClick={() => onNavigate("Home")}
-            className="text-sm text-[#C5A059] font-bold hover:underline"
-          >
-            홈으로 돌아가기
-          </button>
+    <div className="min-h-screen bg-[#FDF8F2] p-6">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex justify-between items-center mb-10">
+          <h2 className="text-3xl font-black text-[#3a2e24] font-serif">주일예배 영상</h2>
+          {/* ⭐ 관리자에게만 보이는 마법의 + 버튼 */}
+          {isAdmin && (
+            <button onClick={handleAdd} className="bg-[#3a2e24] text-white px-6 py-2 rounded-full font-bold shadow-lg">+ 신규 영상 등록</button>
+          )}
         </div>
 
-        {/* 메인 영상 플레이어 */}
-        <div className="bg-white p-4 rounded-[2.5rem] shadow-2xl border border-[#E9DCC9] overflow-hidden mb-10">
-          <div className="aspect-video w-full rounded-[1.5rem] overflow-hidden bg-black shadow-inner">
-            <iframe
-              className="w-full h-full"
-              src={`https://www.youtube.com/embed/${videoId}`}
-              title="주일예배 영상"
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            ></iframe>
-          </div>
-          <div className="mt-6 px-4 pb-4">
-            <span className="text-[10px] bg-[#C5A059] text-white px-3 py-1 rounded-full font-bold uppercase tracking-widest">Live Archive</span>
-            <h2 className="text-2xl font-bold text-[#3a2e24] mt-3">2026년 4월 12일 주일 대예배</h2>
-            <p className="text-[#8b5e3c] mt-1 font-serif text-sm">본문: 시편 119:105 | 설교: "내 길에 빛이 되는 말씀"</p>
-          </div>
-        </div>
-
-        {/* 이전 영상 리스트 (심플 버전) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-white/60 p-4 rounded-3xl border border-[#E9DCC9] hover:shadow-lg transition-all cursor-pointer group">
-              <div className="aspect-video bg-[#E9DCC9] rounded-xl mb-3 overflow-hidden flex items-center justify-center text-[#C5A059]">
-                <span className="text-2xl opacity-50">▶</span>
+        <div className="space-y-12">
+          {worshipList.map((video) => (
+            <div key={video.id} className="bg-white rounded-[2.5rem] p-6 shadow-sm border border-[#f5e6d3]">
+              {isAdmin ? (
+                /* 🛠️ 관리자 편집 모드 */
+                <div className="space-y-4 mb-4">
+                  <input 
+                    className="w-full p-3 border rounded-xl" 
+                    value={video.sermonTitle} 
+                    onChange={(e) => {
+                      const newList = [...worshipList];
+                      newList.find(v => v.id === video.id).sermonTitle = e.target.value;
+                      setWorshipList(newList);
+                    }}
+                    placeholder="설교 제목 입력"
+                  />
+                  <input 
+                    className="w-full p-3 border rounded-xl" 
+                    value={video.videoUrl} 
+                    onChange={(e) => {
+                      const newList = [...worshipList];
+                      newList.find(v => v.id === video.id).videoUrl = e.target.value;
+                      setWorshipList(newList);
+                    }}
+                    placeholder="유튜브 URL 입력"
+                  />
+                  <div className="flex gap-2">
+                    <button onClick={() => handleSave(video)} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm">저장하기</button>
+                    <button onClick={() => handleDelete(video.id)} className="bg-red-500 text-white px-4 py-2 rounded-lg text-sm">삭제</button>
+                  </div>
+                </div>
+              ) : (
+                /* 📺 일반 유저 모드 */
+                <h3 className="text-xl font-bold text-[#3a2e24] mb-4">{video.sermonTitle}</h3>
+              )}
+              
+              <div className="relative pt-[56.25%] overflow-hidden rounded-2xl shadow-inner bg-black">
+                <iframe 
+                  className="absolute top-0 left-0 w-full h-full"
+                  src={video.videoUrl}
+                  title="Worship Video"
+                  frameBorder="0"
+                  allowFullScreen
+                ></iframe>
               </div>
-              <p className="text-[11px] text-[#C5A059] font-bold">2026.04.{12-i*7}</p>
-              <h4 className="font-bold text-[#3a2e24] text-sm group-hover:text-[#C5A059] transition-colors">지난 주일예배 다시보기</h4>
             </div>
           ))}
         </div>

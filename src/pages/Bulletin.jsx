@@ -1,48 +1,144 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
 
-export default function Bulletin({ onNavigate }) {
+export default function Bulletin() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+  const [bulletinList, setBulletinList] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // ✅ 신규 주보 입력을 위한 로컬 상태
+  const [newTitle, setNewTitle] = useState("");
+  const [selectedFile, setSelectedFile] = useState(null);
+
+  const fetchBulletins = async () => {
+    try {
+      const res = await fetch('/api/bulletin/list').then(r => r.json());
+      setBulletinList(res.data || []);
+    } catch (e) {
+      console.error("주보 로드 실패:", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchBulletins(); }, []);
+
+  // 🛠️ 관리자 전용: 주보 업로드 (+)
+  const handleUpload = async () => {
+    if (!selectedFile || !newTitle) return alert("주보 제목과 PDF 파일을 모두 등록해주세요.");
+    
+    const formData = new FormData();
+    formData.append("bulletin", selectedFile);
+    formData.append("title", newTitle);
+
+    try {
+      const res = await fetch("/api/admin/upload-bulletin", {
+        method: "POST",
+        body: formData,
+      });
+      if (res.ok) {
+        alert("✨ 새로운 주보가 리스트에 추가되었습니다.");
+        setNewTitle("");
+        setSelectedFile(null);
+        fetchBulletins(); // 리스트 갱신
+      }
+    } catch (e) {
+      alert("업로드 중 오류가 발생했습니다.");
+    }
+  };
+
+  // 🛠️ 관리자 전용: 주보 삭제 (X)
+  const handleDelete = async (id) => {
+    if (!window.confirm("이 주보를 삭제하시겠습니까?")) return;
+    try {
+      await fetch('/api/admin/bulletin-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [id] })
+      });
+      fetchBulletins();
+    } catch (e) {
+      alert("삭제 실패");
+    }
+  };
+
+  if (loading) return <div className="p-20 text-center font-serif text-[#8b5e3c]">주보를 정리하는 중입니다...</div>;
+
   return (
-    <div className="min-h-screen bg-[#F9F7F2] py-12 px-6 font-sans">
+    <div className="min-h-screen bg-[#FDF8F2] p-6 md:p-12 font-sans">
       <div className="max-w-4xl mx-auto">
-        {/* 상단 헤더 */}
-        <div className="mb-8 border-b-2 border-[#E9DCC9] pb-6 text-center">
-          <h1 className="text-3xl font-black text-[#3a2e24] tracking-tighter font-serif">온라인 주보</h1>
-          <p className="text-[#C5A059] mt-2 font-bold tracking-widest text-xs uppercase">Sae Hakjang Church Bulletin</p>
-        </div>
+        <h2 className="text-3xl font-black text-[#3a2e24] font-serif mb-10 border-b-2 border-[#f5e6d3] pb-4">
+          주간 주보
+        </h2>
 
-        {/* 주보 컨텐츠 박스 */}
-        <div className="bg-white rounded-[3rem] shadow-2xl border border-[#E9DCC9] overflow-hidden relative">
-          {/* 주보 상단 장식 */}
-          <div className="h-3 bg-[#C5A059] w-full"></div>
-          
-          <div className="p-8 md:p-16 text-center">
-            <div className="mb-10">
-              <span className="text-[#8b5e3c] font-serif italic border-b border-[#E9DCC9] pb-2 px-4">2026년 4월 12일</span>
-              <h2 className="text-4xl font-black text-[#3a2e24] mt-6 font-serif tracking-widest">주 보</h2>
-            </div>
-
-            {/* 실제 주보 내용 (이미지 혹은 텍스트) */}
-            <div className="min-h-[600px] border-4 border-double border-[#E9DCC9] rounded-[2rem] p-8 flex flex-col items-center justify-center bg-[#FDFBF7]">
-              <p className="text-gray-400 font-serif italic">
-                여기에 주보 이미지 파일 혹은 PDF 뷰어를 연결할 수 있습니다.<br/>
-                현재는 디자인 가이드라인이 적용된 상태입니다.
-              </p>
-              {/* <img src="/path-to-bulletin.jpg" alt="주보 내용" className="w-full h-auto" /> */}
-            </div>
-
-            {/* 하단 버튼 */}
-            <div className="mt-12 flex justify-center gap-4">
-              <button className="px-8 py-3 bg-[#3a2e24] text-white rounded-full font-bold text-sm shadow-lg hover:opacity-90 transition-all">
-                주보 다운로드 (PDF)
-              </button>
+        {/* ⭐ 관리자에게만 보이는 상단 업로드 바 */}
+        {isAdmin && (
+          <div className="mb-10 p-6 bg-white rounded-[2rem] shadow-md border-2 border-dashed border-[#C5A059]">
+            <p className="text-xs font-bold text-[#C5A059] mb-4 uppercase tracking-widest">Administrator: 신규 주보 등록</p>
+            <div className="flex flex-col md:flex-row gap-3">
+              <input 
+                type="text" 
+                placeholder="주보 명칭 (예: 4월 3주차)"
+                className="flex-1 p-3 rounded-xl border border-gray-200 text-sm focus:outline-[#C5A059]"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+              />
+              <input 
+                type="file" 
+                className="flex-1 text-xs file:bg-[#3a2e24] file:text-white file:border-none file:px-4 file:py-2 file:rounded-lg cursor-pointer"
+                onChange={(e) => setSelectedFile(e.target.files[0])}
+              />
               <button 
-                onClick={() => onNavigate("Home")}
-                className="px-8 py-3 border-2 border-[#E9DCC9] text-[#8b5e3c] rounded-full font-bold text-sm hover:bg-[#F9F7F2] transition-all"
+                onClick={handleUpload}
+                className="bg-[#C5A059] text-white px-8 py-3 rounded-xl font-bold text-sm hover:bg-[#3a2e24] transition-all"
               >
-                메인으로 돌아가기
+                업로드 (+)
               </button>
             </div>
           </div>
+        )}
+
+        <div className="grid gap-4">
+          {bulletinList.length === 0 ? (
+            <p className="text-center py-20 text-gray-400 italic">등록된 주보가 없습니다.</p>
+          ) : (
+            bulletinList.map((b) => (
+              <div key={b.id} className="group flex items-center justify-between p-6 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all border border-gray-50">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-[#fdf8f2] rounded-full flex items-center justify-center text-xl">📄</div>
+                  <div>
+                    <h4 className="font-bold text-[#3a2e24]">{b.title}</h4>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-tighter">
+                      {new Date(b.createdAt).toLocaleDateString()} 발행
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <a 
+                    href={b.bulletinUrl} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="px-5 py-2 bg-gray-100 text-[#3a2e24] rounded-full text-xs font-bold hover:bg-[#3a2e24] hover:text-white transition-all"
+                  >
+                    주보 보기
+                  </a>
+                  
+                  {/* ⭐ 관리자에게만 보이는 삭제 버튼 */}
+                  {isAdmin && (
+                    <button 
+                      onClick={() => handleDelete(b.id)}
+                      className="p-2 text-red-300 hover:text-red-600 transition-colors"
+                      title="주보 삭제"
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
