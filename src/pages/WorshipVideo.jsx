@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext";
 
 export default function WorshipVideo() {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user && user.role === 'admin';
   const [worshipList, setWorshipList] = useState([]);
   const [loading, setLoading] = useState(true);
 

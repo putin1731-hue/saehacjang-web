@@ -29,7 +29,7 @@ function AppInner() {
   });
 
   const isLoggedIn = !!user;
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user && user.role === "admin"; // 비회원(null) 안전 처리
 
   const navigate = (page) => {
     console.log("📍 페이지 이동:", page);
@@ -38,39 +38,36 @@ function AppInner() {
     window.scrollTo(0, 0);
   };
 
-  // [수정된 렌더링 엔진: 사역 현장 개방형 구조]
+  // 🛠️ [렌더링 엔진: 개방형 사역 환경 구축]
   const renderPage = () => {
     
-    // 1. 행정 관제 센터 (회원 승인, 기도 관리, 필사 팀 현황 전용)
-    // 오직 관리자(목사님)만 진입 가능한 순수 행정 통로입니다.
+    // 1. 행정 관제 센터 (보안 유지: 관리자만 진입 가능)
     if (currentPage === "adminDashboard" || currentPage === "admin-office") {
       if (!isAdmin) {
-        console.warn("⛔ 관리자 외 접근 차단됨 (행정 센터)");
+        console.warn("⛔ 행정 센터는 관리자 전용입니다.");
         return <Home onNavigate={navigate} currentUser={user} />;
       }
       return <AdminDashboard onNavigate={navigate} user={user} />;
     }
 
-    // 2. 사역 현장 및 보안 체크 (성도용 필수 페이지)
-    // 예배 영상과 주보를 이 공용 통로로 이동시켰습니다.
-    const protectedPages = ["prayer", "dashboard", "bible", "worship_video", "bulletin"];
+    // 2. 공용 보안 체크 (기도요청, 대시보드, 성경필사만 로그인 필수)
+    // ⭐ worship_video와 bulletin을 여기서 제거하여 비회원에게 개방했습니다.
+    const protectedPages = ["prayer", "dashboard", "bible"];
     if (protectedPages.includes(currentPage) && !isLoggedIn) {
-      console.log("🔒 로그인 필요 페이지 접근 - 로그인으로 이동");
+      console.log("🔒 로그인 필요 페이지 - 로그인으로 이동");
       return <Login onNavigate={navigate} />;
     }
 
-    // 3. 페이지 스위칭 로직 (성도/관리자 공용 공간)
+    // 3. 페이지 스위칭 로직 (로그인 여부와 무관하게 접근 가능한 공용 사역 공간)
     switch (currentPage) {
-      case "dashboard": 
-        return <Dashboard onNavigate={navigate} user={user} />;
-      
-      // ⭐ 예배 영상과 주보는 이제 모든 성도가 들어올 수 있습니다.
-      // 내부 로직에 의해 관리자에게만 편집 버튼이 노출됩니다.
       case "worship_video": 
         return <WorshipVideo onNavigate={navigate} />;
       
       case "bulletin": 
         return <Bulletin onNavigate={navigate} />;
+
+      case "dashboard": 
+        return <Dashboard onNavigate={navigate} user={user} />;
       
       case "prayer": 
         return <PrayerBoard currentUser={user} onNavigate={navigate} />;

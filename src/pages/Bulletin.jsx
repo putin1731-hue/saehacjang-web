@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext";
 
 export default function Bulletin() {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user && user.role === 'admin';
   const [bulletinList, setBulletinList] = useState([]);
   const [loading, setLoading] = useState(true);
 
