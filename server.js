@@ -69,42 +69,64 @@ const upload = multer({ storage: storage });
     [API] 유저 관리 및 승인 (보강된 로직)
 ───────────────────────────────────────── */
 
-// 1. 회원가입 (새가족 등록)
+/* ─────────────────────────────────────────
+    [행정부] 데이터 보관소 (유저 리스트)
+───────────────────────────────────────── */
+let MEMBERS = [
+    { id: 1, name: "황의종", phone: "01025530691", role: "admin", status: "ACTIVE", activeTeams: 0 },
+    { id: 2, name: "이준혁", phone: "01051581731", role: "user", status: "ACTIVE", activeTeams: 1 }
+    // 새가족이 가입하면 여기에 { status: "PENDING" } 상태로 추가됩니다.
+];
+
+// ... (다른 리스트들 생략) ...
+
+/* ─────────────────────────────────────────
+    [API] 유저 관리 및 승인 (이 부분이 핵심입니다!)
+───────────────────────────────────────── */
+
+// 1. 회원가입 API: 가입 시 PENDING 상태로 확실히 저장
 app.post('/api/signup', (req, res) => {
     const { name, phone } = req.body;
     const cleanPhone = phone.replace(/-/g, "");
-    if (MEMBERS.find(m => m.phone === cleanPhone)) return res.status(400).json({ success: false, message: "이미 가입된 번호입니다." });
     
+    // 중복 체크
+    if (MEMBERS.find(m => m.phone === cleanPhone)) {
+        return res.status(400).json({ success: false, message: "이미 등록된 번호입니다." });
+    }
+
     const newUser = { 
         id: Date.now(), 
         name, 
         phone: cleanPhone, 
         role: "user", 
-        status: "PENDING", 
+        status: "PENDING", // 반드시 대기 상태로!
         activeTeams: 0, 
         createdAt: new Date().toISOString() 
     };
+
     MEMBERS.push(newUser);
-    console.log(`🆕 새가족 등록 신청: ${name}`);
+    console.log(`🆕 새가족 가입 신청: ${name} (${cleanPhone})`);
     res.json({ success: true });
 });
 
-// 2. 관리자용 전체 명단 조회
+// 2. 관리자용 전체 유저 조회 API: 반드시 MEMBERS 전체를 보냄
 app.get('/api/admin/users', (req, res) => {
-    const sorted = [...MEMBERS].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    res.json(sorted);
+    console.log("👮 관리자가 전체 명단을 요청했습니다. 현재 인원:", MEMBERS.length);
+    res.json(MEMBERS); // 필터링하지 말고 전체를 다 보내야 프론트에서 PENDING을 골라냅니다.
 });
 
-// 3. 성도 상태 변경 (승인/거절)
+// 3. 유저 상태 변경 API: 승인 누르면 ACTIVE로 변경
 app.post('/api/admin/update-user-status', (req, res) => {
     const { userId, status } = req.body;
-    const user = MEMBERS.find(u => u.id === userId);
-    if (user) { 
-        user.status = status; 
+    const user = MEMBERS.find(u => u.id === Number(userId));
+    
+    if (user) {
+        user.status = status;
         console.log(`✅ 유저 상태 변경: ${user.name} -> ${status}`);
-        res.json({ success: true }); 
+        res.json({ success: true });
+    } else {
+        res.status(404).json({ success: false, message: "유저를 찾을 수 없습니다." });
     }
-    else res.status(404).json({ success: false });
 });
 
 /* ─────────────────────────────────────────
