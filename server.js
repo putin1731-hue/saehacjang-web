@@ -1,5 +1,4 @@
 import express from 'express';
-import cron from 'node-cron';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -20,9 +19,9 @@ app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 ───────────────────────────────────────── */
 
 let MEMBERS = [
-    { id: 1, name: "황의종", phone: "01025530691", role: "admin", status: "ACTIVE", activeTeams: 0 },
-    { id: 2, name: "이준혁", phone: "01051581731", role: "user", status: "ACTIVE", activeTeams: 1 },
-    { id: 99, name: "새가족테스트", phone: "01000000000", role: "user", status: "PENDING", activeTeams: 0 } 
+    { id: 1, name: "황의종", phone: "01025530691", role: "admin", status: "ACTIVE", activeTeams: 0, createdAt: new Date(2024, 0, 1).toISOString() },
+    { id: 2, name: "이준혁", phone: "01051581731", role: "user", status: "ACTIVE", activeTeams: 1, createdAt: new Date(2024, 0, 2).toISOString() },
+    { id: 99, name: "새가족테스트", phone: "01000000000", role: "user", status: "PENDING", activeTeams: 0, createdAt: new Date().toISOString() } 
 ];
 
 let PRAYERS = [
@@ -39,22 +38,21 @@ let BULLETIN_LIST = [
 ];
 
 /* ─────────────────────────────────────────
-    [지휘부] 릴레이 및 팀별 필사 현황 (핵심 업데이트 영역)
+    [지휘부] 릴레이 필사 현황 (창세기 1:1 리셋)
 ───────────────────────────────────────── */
-// ⭐ let으로 선언하여 데이터 갱신이 가능하도록 설정
 let relayStatus = {
     currentRunner: MEMBERS[1], 
     deadline: Date.now() + (48 * 60 * 60 * 1000), 
     isConfirmed: true, 
     status: "ACTIVE", 
-    totalVerseCount: 1254, 
+    totalVerseCount: 0, 
     currentBookName: "창세기", 
     currentChapterNum: 1, 
     currentVerseNum: 1,
     teamProgress: [
-        { name: "사랑팀", progress: 75 },
-        { name: "소망팀", progress: 62 },
-        { name: "믿음팀", progress: 88 }
+        { name: "사랑팀", progress: 0 },
+        { name: "소망팀", progress: 0 },
+        { name: "믿음팀", progress: 0 }
     ]
 };
 
@@ -68,33 +66,61 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 /* ─────────────────────────────────────────
-    [API] 유저 관리 및 승인
+    [API] 유저 관리 및 승인 (보강된 로직)
 ───────────────────────────────────────── */
+
+// 1. 회원가입 (새가족 등록)
 app.post('/api/signup', (req, res) => {
     const { name, phone } = req.body;
     const cleanPhone = phone.replace(/-/g, "");
-    if (MEMBERS.find(m => m.phone === cleanPhone)) return res.status(400).json({ success: false });
-    MEMBERS.push({ id: Date.now(), name, phone: cleanPhone, role: "user", status: "PENDING", activeTeams: 0, createdAt: new Date().toISOString() });
+    if (MEMBERS.find(m => m.phone === cleanPhone)) return res.status(400).json({ success: false, message: "이미 가입된 번호입니다." });
+    
+    const newUser = { 
+        id: Date.now(), 
+        name, 
+        phone: cleanPhone, 
+        role: "user", 
+        status: "PENDING", 
+        activeTeams: 0, 
+        createdAt: new Date().toISOString() 
+    };
+    MEMBERS.push(newUser);
+    console.log(`🆕 새가족 등록 신청: ${name}`);
     res.json({ success: true });
 });
 
-app.get('/api/admin/users', (req, res) => res.json(MEMBERS || []));
+// 2. 관리자용 전체 명단 조회
+app.get('/api/admin/users', (req, res) => {
+    const sorted = [...MEMBERS].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    res.json(sorted);
+});
 
+// 3. 성도 상태 변경 (승인/거절)
 app.post('/api/admin/update-user-status', (req, res) => {
     const { userId, status } = req.body;
     const user = MEMBERS.find(u => u.id === userId);
-    if (user) { user.status = status; res.json({ success: true }); }
+    if (user) { 
+        user.status = status; 
+        console.log(`✅ 유저 상태 변경: ${user.name} -> ${status}`);
+        res.json({ success: true }); 
+    }
     else res.status(404).json({ success: false });
 });
 
 /* ─────────────────────────────────────────
     [API] 사역 콘텐츠 (예배/주보/기도)
 ───────────────────────────────────────── */
+
+// 예배 영상
 app.get('/api/worship/list', (req, res) => res.json({ success: true, data: [...WORSHIP_LIST].reverse() }));
 app.post('/api/admin/worship-update', (req, res) => {
     const { id, videoUrl, sermonTitle } = req.body;
-    if (id && String(id).startsWith('temp')) WORSHIP_LIST.push({ id: Date.now(), videoUrl, sermonTitle, updatedAt: new Date().toISOString() });
-    else { const idx = WORSHIP_LIST.findIndex(w => w.id === id); if (idx !== -1) WORSHIP_LIST[idx] = { ...WORSHIP_LIST[idx], videoUrl, sermonTitle, updatedAt: new Date().toISOString() }; }
+    if (id && String(id).startsWith('temp')) {
+        WORSHIP_LIST.push({ id: Date.now(), videoUrl, sermonTitle, updatedAt: new Date().toISOString() });
+    } else {
+        const idx = WORSHIP_LIST.findIndex(w => w.id === id);
+        if (idx !== -1) WORSHIP_LIST[idx] = { ...WORSHIP_LIST[idx], videoUrl, sermonTitle, updatedAt: new Date().toISOString() };
+    }
     res.json({ success: true });
 });
 app.post('/api/admin/worship-delete', (req, res) => {
@@ -103,6 +129,7 @@ app.post('/api/admin/worship-delete', (req, res) => {
     res.json({ success: true });
 });
 
+// 주보 관리
 app.get('/api/bulletin/list', (req, res) => res.json({ success: true, data: [...BULLETIN_LIST].reverse() }));
 app.post('/api/admin/upload-bulletin', upload.single('bulletin'), (req, res) => {
     if (!req.file) return res.status(400).json({ success: false });
@@ -115,28 +142,25 @@ app.post('/api/admin/bulletin-delete', (req, res) => {
     res.json({ success: true });
 });
 
+// 기도 제목
 app.get('/api/prayers', (req, res) => res.json({ success: true, data: PRAYERS }));
 
 /* ─────────────────────────────────────────
-    [핵심 API] 릴레이 필사 위치 업데이트 로직
+    [핵심 API] 릴레이 필사 실시간 동기화
 ───────────────────────────────────────── */
 app.get('/api/relay/status', (req, res) => {
     res.json({ ...relayStatus, timeLeft: Math.max(0, relayStatus.deadline - Date.now()) });
 });
 
-// ⭐ 필사 완료 시 호출되어 서버 데이터를 실제로 변경하는 API
 app.post('/api/relay/update-verse', (req, res) => {
     const { count, bookName, chapterNum, verseNum } = req.body;
-    
-    // 서버의 relayStatus 값을 클라이언트가 보낸 최신 위치로 갱신합니다.
     if (bookName) relayStatus.currentBookName = bookName;
     if (chapterNum) relayStatus.currentChapterNum = chapterNum;
     if (verseNum) relayStatus.currentVerseNum = verseNum;
     if (typeof count === 'number') {
-        relayStatus.totalVerseCount = count; // 전체 누적 구절 수 업데이트
+        relayStatus.totalVerseCount = count;
     }
-
-    console.log(`📖 [위치 갱신] 현재 위치: ${relayStatus.currentBookName} ${relayStatus.currentChapterNum}:${relayStatus.currentVerseNum}`);
+    console.log(`📖 [위치 갱신] ${relayStatus.currentBookName} ${relayStatus.currentChapterNum}:${relayStatus.currentVerseNum}`);
     res.json({ success: true, currentStatus: relayStatus });
 });
 
@@ -160,4 +184,4 @@ const buildPath = path.resolve(__dirname, 'dist');
 app.use(express.static(buildPath));
 app.get('*', (req, res) => res.sendFile(path.join(buildPath, 'index.html')));
 
-app.listen(PORT, () => console.log(`🚀 Server Running with Real-time Sync Support`));
+app.listen(PORT, () => console.log(`🚀 Saehakjang Full-System Server Running on Port ${PORT}`));

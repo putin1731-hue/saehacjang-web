@@ -38,26 +38,23 @@ function AppInner() {
   const renderPage = () => {
     
     // 🟢 [보안 계층 1] 관리자 관제 센터 (adminDashboard)
-    // 로그인은 물론, 반드시 'admin' 권한이 있어야만 진입 가능
     if (currentPage === "adminDashboard" || currentPage === "admin-office") {
       if (!isAdmin) {
         console.warn("⛔ 관리자 전용 구역입니다. 홈으로 이동합니다.");
         return <Home onNavigate={navigate} currentUser={user} />;
       }
+      // [수정] AdminDashboard에 user 정보 전달
       return <AdminDashboard onNavigate={navigate} user={user} />;
     }
 
     // 🟡 [보안 계층 2] 성도 전용 페이지 (Dashboard, 필사, 기도)
-    // 성도 개인 정보 및 릴레이 현황이 포함되므로 "반드시 로그인" 필요
     const protectedPages = ["dashboard", "bible", "prayer"];
     if (protectedPages.includes(currentPage) && !isLoggedIn) {
       console.log("🔒 로그인 후 이용 가능한 메뉴입니다.");
       return <Login onNavigate={navigate} />;
     }
 
-    // ⚪ [보안 계층 3] 사역 개방 페이지 (WorshipVideo, Bulletin)
-    // 이 페이지들은 위의 protectedPages에 포함되지 않으므로, 
-    // 로그인 여부와 관계없이 누구나 볼 수 있습니다.
+    // ⚪ [보안 계층 3] 사역 개방 페이지 및 기타 (기존 로직 유지)
     switch (currentPage) {
       case "worship_video": 
         return <WorshipVideo onNavigate={navigate} />;
@@ -72,6 +69,7 @@ function AppInner() {
         return <PrayerBoard currentUser={user} onNavigate={navigate} />;
       
       case "bible": 
+        // [수정] BibleWrite가 끝났을 때 홈으로 이동하도록 설정
         return <BibleWrite onFinish={() => navigate("home")} />;
 
       case "history": 
