@@ -1,21 +1,22 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { BIBLE_LIST } from "../data/bibleMeta";
 
-export default function BibleWrite({ onFinish }) {
-  // 1. 상태 관리: 권(Book), 장(Chapter), 절(Verse) - 창세기 1장 1절(인덱스 0)부터 시작하도록 초기화 로직 강화
+export default function BibleWrite({ onFinish, currentUser, relayStatus }) {
+  
+  // 🚀 1. 입구 보안 검사 (내 순서가 아니면 안내 화면 노출 후 차단)
+  const isMyTurn = currentUser?.phone === relayStatus?.currentRunner?.phone;
+
+  // 🚀 2. 상태 관리 (초기값은 서버 데이터[relayStatus]를 최우선으로 설정!)
   const [bookIndex, setBookIndex] = useState(() => {
-    const last = localStorage.getItem("lastBookIndex");
-    return last !== null ? Number(last) : 0; // 기본값: 창세기
+    const bookName = relayStatus?.currentBookName || "창세기";
+    const idx = BIBLE_LIST.findIndex(b => b.name === bookName);
+    return idx !== -1 ? idx : 0;
   });
 
-  const [chapterIndex, setChapterIndex] = useState(() => {
-    const last = localStorage.getItem("lastChapterIndex");
-    return last !== null ? Number(last) : 1; // 기본값: 1장
-  });
-
+  const [chapterIndex, setChapterIndex] = useState(relayStatus?.currentChapterNum || 1);
   const [verseIndex, setVerseIndex] = useState(() => {
-    const last = localStorage.getItem("lastVerseIndex");
-    return last !== null ? Number(last) : 0; // 기본값: 1절
+    const v = relayStatus?.currentVerseNum || 1;
+    return v > 0 ? v - 1 : 0; // 서버 1절 = 인덱스 0
   });
   
   const [bibleData, setBibleData] = useState(null);
@@ -27,41 +28,45 @@ export default function BibleWrite({ onFinish }) {
   const [nextName, setNextName] = useState("");
   const [nextPhone, setNextPhone] = useState("");
   
-  // 팝업 관리
   const [showCompleteModal, setShowCompleteModal] = useState(false);
-  const [completeType, setCompleteType] = useState("CHAPTER"); // "CHAPTER" 또는 "BOOK"
+  const [completeType, setCompleteType] = useState("CHAPTER");
 
-  // 📖 성경 데이터 동적 로드 (파일명 매칭 강화)
+  // 🚀 3. [자동 동기화] 서버에서 주자가 바뀌거나 위치가 바뀌면 즉시 반영
+  useEffect(() => {
+    if (relayStatus) {
+      const bIdx = BIBLE_LIST.findIndex(b => b.name === relayStatus.currentBookName);
+      if (bIdx !== -1) setBookIndex(bIdx);
+      setChapterIndex(relayStatus.currentChapterNum || 1);
+      setVerseIndex((relayStatus.currentVerseNum || 1) - 1);
+      // 위치가 바뀌면 입력창도 초기화
+      setUserInput("");
+      setIsVerseComplete(false);
+      setIsCorrect(true);
+    }
+  }, [relayStatus?.currentBookName, relayStatus?.currentChapterNum, relayStatus?.currentVerseNum]);
+
+  // 🚀 4. 성경 데이터 파일 로드
   useEffect(() => {
     const loadBible = async () => {
       try {
         setLoading(true);
         const target = BIBLE_LIST[bookIndex];
-        
-        // 파일명 예시: 01_Gen_01.json (숫자와 약어, 장 번호를 2자리로 맞춤)
         const chapterStr = String(chapterIndex).padStart(2, '0');
         const fileName = `${target.id}_${target.abbr}_${chapterStr}.json`;
         
-        console.log(`📡 요청 중인 파일: ${fileName}`);
         const response = await fetch(`/api/bible/${fileName}`);
-        
         if (!response.ok) {
-          // 다음 장이 없으면 해당 권을 다 읽은 것으로 판단
           if (chapterIndex > 1) {
             setCompleteType("BOOK");
             setShowCompleteModal(true);
           }
-          setLoading(false);
           return;
         }
         
         const data = await response.json();
-        if (data?.verses) {
-          setBibleData(data.verses);
-          setShowCompleteModal(false);
-        }
+        if (data?.verses) setBibleData(data.verses);
       } catch (error) {
-        console.error("데이터 로드 실패:", error);
+        console.error("파일 로드 실패:", error);
       } finally {
         setLoading(false);
       }
@@ -71,7 +76,7 @@ export default function BibleWrite({ onFinish }) {
 
   const currentBible = bibleData?.[verseIndex];
 
-  // 상태 업데이트 및 로컬스토리지 저장
+  // 상태 업데이트 및 로컬 저장 (백업용 유지)
   const updateState = useCallback((nextBook, nextChapter, nextVerse) => {
     setBookIndex(nextBook);
     setChapterIndex(nextChapter);
@@ -85,7 +90,7 @@ export default function BibleWrite({ onFinish }) {
     setShowCompleteModal(false);
   }, []);
 
-  // 서버에 진행 상황 보고
+  // 서버에 진행 상황 실시간 보고
   const reportProgressToServer = async (vIdx) => {
     try {
       const targetVerse = bibleData?.[vIdx];
@@ -101,13 +106,11 @@ export default function BibleWrite({ onFinish }) {
     } catch (error) { console.error("서버 보고 실패:", error); }
   };
 
-  // 다음 구절로 이동 로직
   const moveToNextVerse = useCallback(() => {
     if (!bibleData || bibleData.length === 0 || !isVerseComplete) return;
 
     let nextVerse = verseIndex + 1;
     if (nextVerse >= bibleData.length) {
-      // 한 장 완료 시 팝업 노출
       setCompleteType("CHAPTER");
       setShowCompleteModal(true);
     } else {
@@ -116,7 +119,6 @@ export default function BibleWrite({ onFinish }) {
     }
   }, [bibleData, verseIndex, bookIndex, chapterIndex, isVerseComplete, updateState]);
 
-  // 팝업 버튼 핸들러
   const handleModalNext = () => {
     if (completeType === "CHAPTER") {
       updateState(bookIndex, chapterIndex + 1, 0);
@@ -164,6 +166,25 @@ export default function BibleWrite({ onFinish }) {
     } catch (e) { alert("연결 실패"); }
   };
 
+  // 🚀 [보안] 내 순서가 아닐 때 보여줄 화면
+  if (!isMyTurn) {
+    return (
+      <div className="min-h-screen bg-[#F9F7F2] flex items-center justify-center p-6">
+        <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl border-2 border-[#D29181] text-center max-w-md">
+          <span className="text-6xl mb-6 block">✋</span>
+          <h2 className="text-2xl font-bold text-[#3a2e24] mb-4 font-serif">지금은 필사 순서가 아닙니다</h2>
+          <p className="text-[#8b5e3c] mb-8 leading-relaxed">
+            현재 주자는 <span className="font-bold text-[#C5A059]">{relayStatus?.currentRunner?.name || "확인 중"}</span> 님입니다.<br/>
+            순서가 되면 다시 방문해 주세요!
+          </p>
+          <button onClick={onFinish} className="w-full py-4 bg-[#D29181] text-white rounded-full font-bold hover:bg-[#b87a6a] transition-all shadow-lg">
+            대시보드로 돌아가기
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (loading || (!currentBible && !showCompleteModal)) return (
     <div className="min-h-screen bg-[#F9F7F2] flex items-center justify-center font-serif text-[#C5A059] animate-pulse">
       말씀을 불러오고 있습니다...
@@ -173,7 +194,7 @@ export default function BibleWrite({ onFinish }) {
   return (
     <div className="min-h-screen bg-[#F9F7F2] py-8 px-6 font-sans select-none relative">
       
-      {/* 🎊 완료 축하 팝업 UI */}
+      {/* 🎊 완료 축하 팝업 */}
       {showCompleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#3a2e24]/40 backdrop-blur-sm p-4">
           <div className="bg-[#F9F7F2] p-12 rounded-[2.5rem] border-2 border-[#C5A059] text-center shadow-2xl max-w-md w-full animate-in zoom-in duration-300">
@@ -197,7 +218,7 @@ export default function BibleWrite({ onFinish }) {
       )}
 
       <div className="max-w-4xl mx-auto">
-        {/* 헤더 및 진행바 */}
+        {/* 상단 진행 표시줄 */}
         <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between border-b-2 border-[#E9DCC9] pb-4 gap-4">
           <div className="flex-1">
             <div className="flex items-center gap-4">
@@ -220,7 +241,7 @@ export default function BibleWrite({ onFinish }) {
           </div>
         </div>
 
-        {/* 필사 카드 영역 */}
+        {/* 필사 카드 메인 */}
         <div className="bg-white rounded-[2.5rem] shadow-2xl border border-[#E9DCC9] overflow-hidden">
           <div className="bg-[#C5A059] py-4 px-10 text-white flex justify-between items-center">
             <span className="text-xl font-serif font-bold">📖 {BIBLE_LIST[bookIndex].name} {chapterIndex}장 {currentBible?.v}절</span>
@@ -256,7 +277,7 @@ export default function BibleWrite({ onFinish }) {
               </button>
             </div>
 
-            {/* 바통 이어주기 UI */}
+            {/* 바통 전달 UI */}
             <div className="mt-10 p-8 bg-[#F9F7F2]/80 rounded-[2.5rem] border border-[#E9DCC9] text-left">
               <h3 className="text-lg font-bold text-[#3a2e24] mb-5 font-serif">🤝 말씀의 바통 이어주기</h3>
               <div className="flex flex-col md:flex-row gap-3">
