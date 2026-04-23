@@ -156,7 +156,7 @@ export default function AdminDashboard({ onNavigate, user }) {
                             <p className="text-lg font-bold text-[#3a2e24]">{u.name}</p>
                             <p className="text-sm text-[#8b5e3c] opacity-70 font-mono">{u.phone}</p>
                             <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest">
-                              신청일: {new Date(u.createdAt).toLocaleDateString()}
+                              신청일: {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "날짜 미상"}
                             </p>
                           </div>
                           <div className="flex gap-2">

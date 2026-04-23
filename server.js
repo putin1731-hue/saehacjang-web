@@ -141,6 +141,24 @@ app.post('/api/admin/bulletin-delete', (req, res) => {
 
 app.get('/api/prayers', (req, res) => res.json({ success: true, data: PRAYERS }));
 
+app.post('/api/prayers', (req, res) => {
+    const { content, authorName, authorPhone, isAnonymous, category } = req.body;
+    if (!content) return res.status(400).json({ success: false, message: "내용이 없습니다." });
+
+    const newPrayer = {
+        id: Date.now(),
+        content,
+        authorName: isAnonymous ? "익명" : (authorName || "성도"),
+        authorPhone: authorPhone || "",
+        isAnonymous: !!isAnonymous,
+        category: category || "기타",
+        createdAt: new Date().toISOString()
+    };
+
+    PRAYERS.push(newPrayer);
+    res.json({ success: true, data: newPrayer });
+});
+
 /* ─────────────────────────────────────────
     [핵심 API] 릴레이 필사 실시간 동기화
 ───────────────────────────────────────── */

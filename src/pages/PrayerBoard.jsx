@@ -45,33 +45,35 @@ export default function PrayerBoard({ currentUser }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.content.trim()) return;
-    
-    // 서비스 규격에 맞게 데이터 생성
-    const prayerEntry = prayerService.createPrayerEntry(
-      user, 
-      form.content, 
-      form.category
-    );
 
-    prayerEntry.isAnonymous = form.isAnonymous;
-    if (form.isAnonymous) {
-      prayerEntry.authorName = "익명";
-    }
-    
-    // 기획관님의 컬러 클래스 로직 추가
-    prayerEntry.colorClass = colorMap[form.category] ?? "c3";
+    try {
+        const res = await fetch('/api/prayers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                content: form.content,
+                authorName: user.name,
+                authorPhone: user.phone || "",
+                isAnonymous: form.isAnonymous,
+                category: form.category
+            })
+        });
 
-    const result = await prayerService.addPrayer(prayerEntry);
-    
-    if (result.success) {
-      await loadPrayers();
-      setForm({ content: "", category: "기타", isAnonymous: false });
-      setShowForm(false);
-      alert("기도 요청이 소중하게 전달되었습니다.");
-    } else {
-      alert("데이터 저장 중 문제가 발생했습니다.");
+        const result = await res.json();
+
+        if (result.success) {
+            await loadPrayers();
+            setForm({ content: "", category: "기타", isAnonymous: false });
+            setShowForm(false);
+            alert("기도 요청이 소중하게 전달되었습니다.");
+        } else {
+            alert("데이터 저장 중 문제가 발생했습니다.");
+        }
+    } catch (err) {
+        console.error(err);
+        alert("서버 연결 오류가 발생했습니다.");
     }
-  };
+};
 
   return (
     <div style={{ background: "var(--cream, #fdf8f2)", minHeight: "100vh" }}>
