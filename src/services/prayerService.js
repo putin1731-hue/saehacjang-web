@@ -1,71 +1,76 @@
 /**
  * [prayerService.js]
- * 성도 기도 제목 관리 (익명성 보장 및 목사님 전용 실명 확인)
- * 저장소: localStorage (서버 구축 전 임시 데이터 저장소)
+ * 성도 기도 제목 관리 (서버 연동형)
+ * 로컬 저장소(localStorage)를 버리고 중앙 서버(server.js)와 실시간 연동됩니다.
  */
 
-const STORAGE_KEY = 'saehacjang_prayers';
-
 export const prayerService = {
-  // 1. [추가] 모든 기도 제목 가져오기 (배달 기능)
+  // 1. 모든 기도 제목 가져오기 (서버 우체국에서 전체 목록 수령)
   getAllPrayers: async () => {
     try {
-      // 로컬 저장소에서 데이터를 읽어옵니다.
-      const data = localStorage.getItem(STORAGE_KEY);
-      const prayers = data ? JSON.parse(data) : [];
+      // 🚀 서버 API 주소로 최신 기도 목록 요청
+      const response = await fetch('/api/prayers');
+      const result = await response.json();
       
-      // 최신순 정렬
-      return { 
-        success: true, 
-        data: prayers.sort((a, b) => b.id - a.id) 
-      };
+      if (response.ok && result.success) {
+        return { 
+          success: true, 
+          data: result.data // 서버 메모리에 저장된 최신 기도 배열
+        };
+      }
+      return { success: false, data: [] };
     } catch (error) {
-      console.error("데이터 로드 실패:", error);
+      console.error("🙏 서버 데이터 로드 실패:", error);
       return { success: false, data: [] };
     }
   },
 
-  // 2. [추가] 새로운 기도 제목 저장하기 (배달 기능)
+  // 2. 새로운 기도 제목 저장하기 (서버 우체국으로 발송)
   addPrayer: async (prayerEntry) => {
     try {
-      const { data: existingPrayers } = await prayerService.getAllPrayers();
-      const updatedPrayers = [prayerEntry, ...existingPrayers];
+      // 🚀 서버 API(/api/prayers)로 새 기도 데이터 전송
+      const response = await fetch('/api/prayers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(prayerEntry)
+      });
       
-      // 로컬 저장소에 저장
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedPrayers));
-      return { success: true };
+      const result = await response.json();
+      return { success: response.ok && result.success };
     } catch (error) {
-      console.error("데이터 저장 실패:", error);
+      console.error("🙏 서버 저장 실패:", error);
       return { success: false };
     }
   },
 
-  // 3. [기존 로직 최적화] 기도 제목 게시물 포맷팅
-  // 일반 성도에겐 익명으로, 목사님(admin)에겐 실명으로 보이게 필터링
+  // 3. 기도 제목 데이터 구조 생성 (규격화)
+  createPrayerEntry: (user, content, category = "기타", isAnonymous = false) => {
+    return {
+      id: Date.now(),
+      authorId: user?.id || 'guest',
+      authorName: user?.name || "성도", 
+      authorPhone: user?.phone || "",
+      content: content,
+      category: category,
+      isAnonymous: isAnonymous,
+      createdAt: new Date().toISOString()
+    };
+  },
+
+  // 4. 포맷팅 로직 (익명 보안 유지)
+  // 일반 성도에겐 "익명의 동역자", 관리자(admin)에겐 실명이 보이게 처리
   getFormattedPrayers: (prayers, currentUser) => {
     if (!prayers) return [];
     
     return prayers.map(prayer => ({
       ...prayer,
-      // 목사님(admin)이면 실명 노출, 아니면 무조건 "익명의 동역자"
-      // [보안강화] currentUser가 없을 경우를 대비한 방어코드 추가
-      authorDisplay: currentUser?.role === 'admin' ? prayer.authorName : "익명의 동역자",
-      // 목사님만 볼 수 있는 추가 정보 (연락처 등)
+      // 관리자(admin) 권한일 때만 실명 노출, 그 외엔 익명 처리
+      authorDisplay: (currentUser?.role === 'admin' || !prayer.isAnonymous) 
+        ? prayer.authorName 
+        : "익명의 동역자",
+      
+      // 관리자만 연락처 확인 가능
       authorContact: currentUser?.role === 'admin' ? (prayer.authorPhone || "연락처 미기입") : null
     }));
-  },
-
-  // 4. [기존 로직 최적화] 기도 제목 저장 시 데이터 구조 생성
-  createPrayerEntry: (user, content, category = "기타") => {
-    return {
-      id: Date.now(),
-      authorId: user?.id || 'guest',
-      authorName: user?.name || "성도", 
-      authorPhone: user?.phone || "010-0000-0000",
-      content: content,
-      category: category,
-      createdAt: new Date().toISOString(),
-      prayerCount: 0
-    };
   }
 };
