@@ -63,9 +63,25 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 /* ─────────────────────────────────────────
-    [API] 유저 관리 (소문자 signup으로 통일!)
+    [API] 📖 성경 말씀 파일 제공 (추가됨!)
 ───────────────────────────────────────── */
-app.post('/api/signup', (req, res) => { // 🚀 소문자로 전격 수정!
+app.get('/api/bible/:fileName', (req, res) => {
+    const { fileName } = req.params;
+    // 🚀 Render 서버의 절대 경로를 사용하여 파일을 찾습니다.
+    const filePath = path.join(__dirname, 'data', 'bible', fileName);
+    
+    res.sendFile(filePath, (err) => {
+        if (err) {
+            console.error("❌ 성경 파일 찾기 실패:", fileName);
+            res.status(404).json({ success: false, message: "말씀 파일을 찾을 수 없습니다." });
+        }
+    });
+});
+
+/* ─────────────────────────────────────────
+    [API] 유저 관리
+───────────────────────────────────────── */
+app.post('/api/signup', (req, res) => {
     const { name, phone } = req.body;
     const cleanPhone = phone.replace(/-/g, "");
     
@@ -78,25 +94,20 @@ app.post('/api/signup', (req, res) => { // 🚀 소문자로 전격 수정!
         name, 
         phone: cleanPhone, 
         role: "user", 
-        status: "ACTIVE", // 🚀 가입 즉시 활동 가능하게 변경!
+        status: "ACTIVE", 
         activeTeams: 0, 
         createdAt: new Date().toISOString() 
     };
 
     MEMBERS.push(newUser);
-    console.log(`🎊 새가족 등록: ${name}`);
     res.json({ success: true, user: newUser });
 });
 
-app.get('/api/admin/users', (req, res) => {
-    // 최신 가입자가 위로 오게 뒤집어서 보냅니다.
-    res.json([...MEMBERS].reverse()); 
-});
+app.get('/api/admin/users', (req, res) => res.json([...MEMBERS].reverse()));
 
 app.post('/api/admin/update-user-status', (req, res) => {
     const { userId, status } = req.body;
     const user = MEMBERS.find(u => String(u.id) === String(userId));
-    
     if (user) {
         user.status = status;
         res.json({ success: true });
@@ -106,15 +117,13 @@ app.post('/api/admin/update-user-status', (req, res) => {
 });
 
 /* ─────────────────────────────────────────
-    [API] 중보기도 (대시보드 연동 강화)
+    [API] 중보기도
 ───────────────────────────────────────── */
-app.get('/api/prayers', (req, res) => {
-    res.json({ success: true, data: [...PRAYERS].reverse() });
-});
+app.get('/api/prayers', (req, res) => res.json({ success: true, data: [...PRAYERS].reverse() }));
 
 app.post('/api/prayers', (req, res) => {
     const { content, authorName, authorPhone, isAnonymous, category } = req.body;
-    if (!content) return res.status(400).json({ success: false, message: "내용이 없습니다." });
+    if (!content) return res.status(400).json({ success: false });
 
     const newPrayer = {
         id: Date.now(),
@@ -127,12 +136,11 @@ app.post('/api/prayers', (req, res) => {
     };
 
     PRAYERS.push(newPrayer);
-    console.log(`🙏 새 기도제목 접수 완료`);
     res.json({ success: true, data: newPrayer });
 });
 
 /* ─────────────────────────────────────────
-    [필사/예배/주보 API] (기존 로직 유지)
+    [API] 릴레이 필사 상태
 ───────────────────────────────────────── */
 app.get('/api/relay/status', (req, res) => {
     res.json({ ...relayStatus, timeLeft: Math.max(0, relayStatus.deadline - Date.now()) });
@@ -147,22 +155,22 @@ app.post('/api/relay/update-verse', (req, res) => {
     res.json({ success: true, currentStatus: relayStatus });
 });
 
+/* ─────────────────────────────────────────
+    [API] 로그인 및 기타
+───────────────────────────────────────── */
 app.post('/api/login', (req, res) => {
     const { name, phone } = req.body;
     const cleanPhone = phone.replace(/-/g, ""); 
     const user = MEMBERS.find(m => m.name === name && m.phone === cleanPhone);
     if (user && user.status === "ACTIVE") res.json({ success: true, user });
-    else if (user && user.status === "PENDING") res.status(401).json({ success: false, message: "승인 대기 중입니다." });
-    else res.status(401).json({ success: false, message: "정보 불일치" });
+    else res.status(401).json({ success: false, message: "로그인 정보 확인" });
 });
 
 app.get('/api/worship/list', (req, res) => res.json({ success: true, data: [...WORSHIP_LIST].reverse() }));
 app.get('/api/bulletin/list', (req, res) => res.json({ success: true, data: [...BULLETIN_LIST].reverse() }));
 
-// ... (기타 주보 업로드/삭제 로직 유지) ...
-
 const buildPath = path.resolve(__dirname, 'dist');
 app.use(express.static(buildPath));
 app.get('*', (req, res) => res.sendFile(path.join(buildPath, 'index.html')));
 
-app.listen(PORT, () => console.log(`🚀 Saehakjang Server FIXED & Running on ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server Running on ${PORT}`));
