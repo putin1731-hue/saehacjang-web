@@ -67,26 +67,39 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 /* ─────────────────────────────────────────
-    [API] 📖 성경 말씀 (대소문자 방어형)
+    [API] 📖 성경 말씀 (보안 및 경로 최적화 버전)
 ───────────────────────────────────────── */
 app.get('/api/bible/:fileName', (req, res) => {
     const { fileName } = req.params;
-    //const bibleDir = path.join(process.cwd(), 'data', 'bible');
-    const bibleDir = path.resolve(__dirname, 'data', 'bible');
     
+    // 🚀 [핵심 수정] Render 서버에서 가장 안전한 절대 경로 탐색
+    const bibleDir = path.resolve(process.cwd(), 'data', 'bible');
+    
+    // 서버 로그 확인용 (Render 대시보드 Logs 탭에서 보임)
+    console.log(`🔍 말씀 요청: ${fileName} | 탐색 위치: ${bibleDir}`);
+
+    // 1. 폴더 존재 여부 확인
     if (!fs.existsSync(bibleDir)) {
-        return res.status(404).json({ success: false, message: "데이터 폴더 실종" });
+        console.error("❌ 폴더 없음: data/bible 폴더를 찾을 수 없습니다.");
+        return res.status(404).json({ success: false, message: "서버 데이터 폴더 실종" });
     }
 
-    fs.readdir(bibleDir, (err, files) => {
-        if (err) return res.status(500).json({ success: false });
+    // 2. 파일 목록 읽기 및 대소문자 무시 검색
+    try {
+        const files = fs.readdirSync(bibleDir);
         const actualFile = files.find(f => f.toLowerCase() === fileName.toLowerCase());
+
         if (actualFile) {
-            res.sendFile(path.join(bibleDir, actualFile));
+            const finalPath = path.join(bibleDir, actualFile);
+            return res.sendFile(finalPath);
         } else {
-            res.status(404).json({ success: false });
+            console.error(`❌ 파일 없음: ${fileName} (대소문자 포함 검색 실패)`);
+            return res.status(404).json({ success: false, message: "파일을 찾을 수 없습니다." });
         }
-    });
+    } catch (error) {
+        console.error("❌ 서버 내부 오류:", error);
+        return res.status(500).json({ success: false });
+    }
 });
 
 /* ─────────────────────────────────────────
@@ -112,14 +125,14 @@ app.post('/api/signup', (req, res) => {
 app.get('/api/admin/users', (req, res) => res.json([...MEMBERS].reverse()));
 
 /* ─────────────────────────────────────────
-    [API] 예배 & 주보 관리 (복구 완료)
+    [API] 예배 & 주보 관리 (기존 기능 유지)
 ───────────────────────────────────────── */
 app.get('/api/worship/list', (req, res) => res.json({ success: true, data: WORSHIP_LIST }));
 
 app.post('/api/admin/worship', (req, res) => {
     const { videoUrl, sermonTitle } = req.body;
     const newWorship = { id: Date.now(), videoUrl, sermonTitle, updatedAt: new Date().toISOString() };
-    WORSHIP_LIST = [newWorship, ...WORSHIP_LIST].slice(0, 5); // 최근 5개 유지
+    WORSHIP_LIST = [newWorship, ...WORSHIP_LIST].slice(0, 5);
     res.json({ success: true, data: newWorship });
 });
 

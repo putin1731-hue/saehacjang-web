@@ -2,10 +2,21 @@ import React, { useState, useEffect, useCallback } from "react";
 import { BIBLE_LIST } from "../data/bibleMeta";
 
 export default function BibleWrite({ onFinish }) {
-  // 1. 상태 관리: 권(Book), 장(Chapter), 절(Verse) - 로컬스토리지 연동
-  const [bookIndex, setBookIndex] = useState(() => Number(localStorage.getItem("lastBookIndex")) || 0);
-  const [chapterIndex, setChapterIndex] = useState(() => Number(localStorage.getItem("lastChapterIndex")) || 1);
-  const [verseIndex, setVerseIndex] = useState(() => Number(localStorage.getItem("lastVerseIndex")) || 0);
+  // 1. 상태 관리: 권(Book), 장(Chapter), 절(Verse) - 창세기 1장 1절(인덱스 0)부터 시작하도록 초기화 로직 강화
+  const [bookIndex, setBookIndex] = useState(() => {
+    const last = localStorage.getItem("lastBookIndex");
+    return last !== null ? Number(last) : 0; // 기본값: 창세기
+  });
+
+  const [chapterIndex, setChapterIndex] = useState(() => {
+    const last = localStorage.getItem("lastChapterIndex");
+    return last !== null ? Number(last) : 1; // 기본값: 1장
+  });
+
+  const [verseIndex, setVerseIndex] = useState(() => {
+    const last = localStorage.getItem("lastVerseIndex");
+    return last !== null ? Number(last) : 0; // 기본값: 1절
+  });
   
   const [bibleData, setBibleData] = useState(null);
   const [userInput, setUserInput] = useState("");
@@ -20,20 +31,22 @@ export default function BibleWrite({ onFinish }) {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [completeType, setCompleteType] = useState("CHAPTER"); // "CHAPTER" 또는 "BOOK"
 
-  // 📖 성경 데이터 동적 로드 (로직 강화 버전)
+  // 📖 성경 데이터 동적 로드 (파일명 매칭 강화)
   useEffect(() => {
     const loadBible = async () => {
       try {
         setLoading(true);
         const target = BIBLE_LIST[bookIndex];
+        
+        // 파일명 예시: 01_Gen_01.json (숫자와 약어, 장 번호를 2자리로 맞춤)
         const chapterStr = String(chapterIndex).padStart(2, '0');
         const fileName = `${target.id}_${target.abbr}_${chapterStr}.json`;
         
+        console.log(`📡 요청 중인 파일: ${fileName}`);
         const response = await fetch(`/api/bible/${fileName}`);
         
-        // 🚀 [수정] 파일이 없는 경우(권 완주) 판단 로직 강화
         if (!response.ok) {
-          // 1장 0절 상태에서 에러가 난 건 통신 문제이므로 팝업을 띄우지 않음
+          // 다음 장이 없으면 해당 권을 다 읽은 것으로 판단
           if (chapterIndex > 1) {
             setCompleteType("BOOK");
             setShowCompleteModal(true);
@@ -45,12 +58,10 @@ export default function BibleWrite({ onFinish }) {
         const data = await response.json();
         if (data?.verses) {
           setBibleData(data.verses);
-          // 새로운 데이터를 정상 로드하면 이전 팝업 상태 초기화
           setShowCompleteModal(false);
         }
       } catch (error) {
-        console.error("파일 로드 중 오류 발생:", error);
-        // 단순 네트워크 에러 시 축하 팝업을 띄우지 않도록 방어
+        console.error("데이터 로드 실패:", error);
       } finally {
         setLoading(false);
       }
@@ -60,7 +71,7 @@ export default function BibleWrite({ onFinish }) {
 
   const currentBible = bibleData?.[verseIndex];
 
-  // 상태 업데이트 및 저장
+  // 상태 업데이트 및 로컬스토리지 저장
   const updateState = useCallback((nextBook, nextChapter, nextVerse) => {
     setBookIndex(nextBook);
     setChapterIndex(nextChapter);
@@ -74,7 +85,7 @@ export default function BibleWrite({ onFinish }) {
     setShowCompleteModal(false);
   }, []);
 
-  // 서버 보고
+  // 서버에 진행 상황 보고
   const reportProgressToServer = async (vIdx) => {
     try {
       const targetVerse = bibleData?.[vIdx];
@@ -87,17 +98,16 @@ export default function BibleWrite({ onFinish }) {
           verseNum: targetVerse?.v || (vIdx + 1)
         })
       });
-    } catch (error) { console.error("서비 보고 실패:", error); }
+    } catch (error) { console.error("서버 보고 실패:", error); }
   };
 
-  // ⏭️ 다음 단계 이동 판단 (정밀 검사 로직 적용)
+  // 다음 구절로 이동 로직
   const moveToNextVerse = useCallback(() => {
-    // 🚀 데이터가 아직 없거나 다 쓰지 않았으면 팝업을 띄우지 않음
     if (!bibleData || bibleData.length === 0 || !isVerseComplete) return;
 
     let nextVerse = verseIndex + 1;
     if (nextVerse >= bibleData.length) {
-      // 진짜로 한 장의 마지막 절을 끝냈을 때만 팝업!
+      // 한 장 완료 시 팝업 노출
       setCompleteType("CHAPTER");
       setShowCompleteModal(true);
     } else {
@@ -106,7 +116,7 @@ export default function BibleWrite({ onFinish }) {
     }
   }, [bibleData, verseIndex, bookIndex, chapterIndex, isVerseComplete, updateState]);
 
-  // 팝업에서 '다음' 버튼 클릭 시
+  // 팝업 버튼 핸들러
   const handleModalNext = () => {
     if (completeType === "CHAPTER") {
       updateState(bookIndex, chapterIndex + 1, 0);
@@ -163,7 +173,7 @@ export default function BibleWrite({ onFinish }) {
   return (
     <div className="min-h-screen bg-[#F9F7F2] py-8 px-6 font-sans select-none relative">
       
-      {/* 🎊 [UI 유지] 장/권 완료 축하 팝업 */}
+      {/* 🎊 완료 축하 팝업 UI */}
       {showCompleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#3a2e24]/40 backdrop-blur-sm p-4">
           <div className="bg-[#F9F7F2] p-12 rounded-[2.5rem] border-2 border-[#C5A059] text-center shadow-2xl max-w-md w-full animate-in zoom-in duration-300">
@@ -187,7 +197,7 @@ export default function BibleWrite({ onFinish }) {
       )}
 
       <div className="max-w-4xl mx-auto">
-        {/* 진행률 바 영역 */}
+        {/* 헤더 및 진행바 */}
         <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between border-b-2 border-[#E9DCC9] pb-4 gap-4">
           <div className="flex-1">
             <div className="flex items-center gap-4">
@@ -210,7 +220,7 @@ export default function BibleWrite({ onFinish }) {
           </div>
         </div>
 
-        {/* 필사 카드 디자인 영역 */}
+        {/* 필사 카드 영역 */}
         <div className="bg-white rounded-[2.5rem] shadow-2xl border border-[#E9DCC9] overflow-hidden">
           <div className="bg-[#C5A059] py-4 px-10 text-white flex justify-between items-center">
             <span className="text-xl font-serif font-bold">📖 {BIBLE_LIST[bookIndex].name} {chapterIndex}장 {currentBible?.v}절</span>
@@ -232,6 +242,7 @@ export default function BibleWrite({ onFinish }) {
               className={`w-full h-32 p-6 rounded-[1.5rem] border-2 text-lg font-serif focus:outline-none transition-all
                 ${!isCorrect ? "border-[#D29181] bg-[#FAF3F2]" : isVerseComplete ? "border-[#C5A059] bg-[#F9F7F2]" : "border-[#E9DCC9] bg-white"}`}
               spellCheck="false"
+              autoFocus
             />
 
             <div className="mt-8 flex justify-center gap-6 border-b border-[#E9DCC9] pb-10">
