@@ -71,7 +71,8 @@ const upload = multer({ storage: storage });
 ───────────────────────────────────────── */
 app.get('/api/bible/:fileName', (req, res) => {
     const { fileName } = req.params;
-    const bibleDir = path.join(process.cwd(), 'data', 'bible');
+    //const bibleDir = path.join(process.cwd(), 'data', 'bible');
+    const bibleDir = path.resolve(__dirname, 'data', 'bible');
     
     if (!fs.existsSync(bibleDir)) {
         return res.status(404).json({ success: false, message: "데이터 폴더 실종" });
