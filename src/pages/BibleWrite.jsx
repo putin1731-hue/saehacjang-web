@@ -177,27 +177,56 @@ export default function BibleWrite({ onFinish }) {
 
       <div className="max-w-4xl mx-auto">
         {/* 헤더 및 진행률 바 */}
-        <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between border-b-2 border-[#E9DCC9] pb-4 gap-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-4">
-              <h1 className="text-3xl font-black text-[#3a2e24] font-serif">성경 필사</h1>
-              <span className="text-[12px] text-white font-bold px-4 py-1 bg-[#C5A059] rounded-full">
-                {BIBLE_LIST[bookIndex].name} {chapterIndex}장 진행 중
-              </span>
-            </div>
-            <p className="text-[#8b5e3c] mt-2 italic font-serif text-sm opacity-90">"주의 말씀은 내 발에 등이요 내 길에 빛이니이다"</p>
-          </div>
+        {/* 헤더 및 진행률 바 (정확한 계산 버전) */}
+<div className="mb-6 flex flex-col gap-4 border-b-2 border-[#E9DCC9] pb-6">
+  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="flex-1">
+      <div className="flex items-center gap-4">
+        <h1 className="text-3xl font-black text-[#3a2e24] font-serif">성경 필사</h1>
+        <span className="text-[12px] text-white font-bold px-4 py-1 bg-[#C5A059] rounded-full">
+          {BIBLE_LIST[bookIndex].name} {chapterIndex}장 진행 중
+        </span>
+      </div>
+      <p className="text-[#8b5e3c] mt-2 italic font-serif text-sm opacity-90">"주의 말씀은 내 발에 등이요 내 길에 빛이니이다"</p>
+    </div>
 
-          <div className="w-full md:w-64 flex flex-col gap-1">
-            <div className="flex justify-between text-[11px] font-extrabold text-[#C5A059] uppercase tracking-tighter">
-              <span>통독 여정</span>
-              <span>{((bookIndex + 1) / 66 * 100).toFixed(1)}%</span>
-            </div>
-            <div className="relative w-full h-2.5 bg-[#E9DCC9] rounded-full overflow-hidden">
-              <div className="h-full bg-[#C5A059] transition-all duration-1000" style={{ width: `${((bookIndex + 1) / 66 * 100)}%` }}></div>
-            </div>
-          </div>
-        </div>
+    {/* 정확한 수치 표시 */}
+    <div className="text-right">
+      <div className="text-[10px] font-bold text-[#C5A059] mb-1 italic">TOTAL PROGRESS</div>
+      <div className="text-3xl font-black text-[#3a2e24] font-serif">
+        {((bookIndex / 66) * 100).toFixed(2)}%
+      </div>
+    </div>
+  </div>
+
+  {/* 통독 여정 그래프 (구약/신약 구분선 추가) */}
+  <div className="relative w-full">
+    <div className="flex justify-between text-[11px] font-extrabold text-[#8b5e3c] uppercase mb-2 tracking-tighter">
+      <span>구약 (Genesis - Malachi)</span>
+      <span className="text-[#C5A059]">신약 (Matthew - Revelation)</span>
+    </div>
+    
+    <div className="relative w-full h-4 bg-[#E9DCC9] rounded-full p-0.5 shadow-inner">
+      {/* 실제 진행바 */}
+      <div 
+        className="h-full bg-[#C5A059] rounded-full transition-all duration-1000 relative"
+        style={{ width: `${(bookIndex / 65) * 100}%` }}
+      >
+        {/* 빛나는 효과 */}
+        <div className="absolute top-0 right-0 w-4 h-full bg-white/30 blur-sm rounded-full"></div>
+      </div>
+
+      {/* 📍 신약 시작점 구분선 (약 60% 지점) */}
+      <div 
+        className="absolute top-0 bottom-0 w-0.5 bg-white/60 z-10" 
+        style={{ left: '59.2%' }} 
+        title="신약 시작점"
+      >
+        <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] text-[#8b5e3c] font-bold">NT</span>
+      </div>
+    </div>
+  </div>
+</div>
 
         {/* 메인 필사 카드 */}
         <div className="bg-white rounded-[2.5rem] shadow-2xl border border-[#E9DCC9] overflow-hidden">
